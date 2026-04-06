@@ -20,7 +20,22 @@ blocked_words = { optional = true, default = "", type = "str", explanation = "Co
 ai_similarity_enabled = {optional = true, option = [true, false], default = false, type = "bool", explanation = "Threads read from Reddit are sorted based on their similarity to the keywords given below"}
 ai_similarity_keywords = {optional = true, type="str", example= 'Elon Musk, Twitter, Stocks', explanation = "Every keyword or even sentence, seperated with comma, is used to sort the reddit threads based on similarity"}
 
+[threads.creds]
+access_token = { optional = false, explanation = "Meta Threads long-lived user access token (User token from Graph API, valid for 60 days)", example = "EAABsbCS..." }
+user_id = { optional = false, explanation = "Numeric Threads user ID", example = "12345678901234567" }
+username = { optional = true, explanation = "Instagram/Threads username for Playwright screenshot login" }
+password = { optional = true, explanation = "Instagram/Threads password for Playwright screenshot login" }
+
+[threads.thread]
+post_id = { optional = true, default = "", regex = "^((?!://|://)[+a-zA-Z0-9])*$", explanation = "Specific Threads post ID to process. Leave blank for auto-pick.", example = "18044348473548254" }
+max_reply_length = { default = 500, optional = false, nmin = 10, nmax = 10000, type = "int", explanation = "Max characters per reply", example = 500, oob_error = "Max reply length should be between 10 and 10000" }
+min_reply_length = { default = 1, optional = true, nmin = 0, nmax = 10000, type = "int", explanation = "Min characters per reply", example = 1, oob_error = "Min reply length should be between 0 and 10000" }
+min_replies = { default = 5, optional = false, nmin = 1, type = "int", explanation = "Minimum number of replies for a post to be eligible", example = 5, oob_error = "Minimum replies should be at least 1" }
+blocked_words = { optional = true, default = "", type = "str", explanation = "Comma-separated list of blocked words/phrases. Posts and replies containing any of these will be skipped.", example = "nsfw, spoiler, politics" }
+
 [settings]
+platform = { optional = false, default = "reddit", options = ["reddit", "threads"], explanation = "Which social media platform to pull content from." }
+post_lang = { default = "", optional = true, explanation = "The language you would like to translate to. Applies to all platforms.", example = "es-cr", options = ['','af', 'ak', 'am', 'ar', 'as', 'ay', 'az', 'be', 'bg', 'bho', 'bm', 'bn', 'bs', 'ca', 'ceb', 'ckb', 'co', 'cs', 'cy', 'da', 'de', 'doi', 'dv', 'ee', 'el', 'en', 'en-US', 'eo', 'es', 'et', 'eu', 'fa', 'fi', 'fr', 'fy', 'ga', 'gd', 'gl', 'gn', 'gom', 'gu', 'ha', 'haw', 'hi', 'hmn', 'hr', 'ht', 'hu', 'hy', 'id', 'ig', 'ilo', 'is', 'it', 'iw', 'ja', 'jw', 'ka', 'kk', 'km', 'kn', 'ko', 'kri', 'ku', 'ky', 'la', 'lb', 'lg', 'ln', 'lo', 'lt', 'lus', 'lv', 'mai', 'mg', 'mi', 'mk', 'ml', 'mn', 'mni-Mtei', 'mr', 'ms', 'mt', 'my', 'ne', 'nl', 'no', 'nso', 'ny', 'om', 'or', 'pa', 'pl', 'ps', 'pt', 'qu', 'ro', 'ru', 'rw', 'sa', 'sd', 'si', 'sk', 'sl', 'sm', 'sn', 'so', 'sq', 'sr', 'st', 'su', 'sv', 'sw', 'ta', 'te', 'tg', 'th', 'ti', 'tk', 'tl', 'tr', 'ts', 'tt', 'ug', 'uk', 'ur', 'uz', 'vi', 'xh', 'yi', 'yo', 'zh-CN', 'zh-TW', 'zu'] }
 allow_nsfw = { optional = false, type = "bool", default = false, example = false, options = [true, false, ], explanation = "Whether to allow NSFW content, True or False" }
 theme = { optional = false, default = "dark", example = "light", options = ["dark", "light", "transparent", ], explanation = "Sets the Reddit theme, either LIGHT or DARK. For story mode you can also use a transparent background." }
 times_to_run = { optional = false, default = 1, example = 2, explanation = "Used if you want to run multiple times. Set to an int e.g. 4 or 29 or 1", type = "int", nmin = 1, oob_error = "It's very hard to run something less than once." }

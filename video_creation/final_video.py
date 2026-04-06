@@ -75,7 +75,8 @@ def name_normalize(name: str) -> str:
     name = re.sub(r"(\w+)\s?\/\s?(\w+)", r"\1 or \2", name)
     name = re.sub(r"\/", r"", name)
 
-    lang = settings.config["reddit"]["thread"]["post_lang"]
+    lang = (settings.config["settings"].get("post_lang") or
+            settings.config.get("reddit", {}).get("thread", {}).get("post_lang", ""))
     if lang:
         print_substep("Translating filename...")
         translated_name = translators.translate_text(name, translator="google", to_language=lang)
@@ -359,7 +360,11 @@ def make_final_video(
     title_thumb = reddit_obj["thread_title"]
 
     filename = f"{name_normalize(title)[:251]}"
-    subreddit = settings.config["reddit"]["thread"]["subreddit"]
+    platform = settings.config["settings"].get("platform", "reddit")
+    if platform == "reddit":
+        subreddit = settings.config["reddit"]["thread"]["subreddit"]
+    else:
+        subreddit = reddit_obj.get("thread_category", platform)
 
     if not exists(f"./results/{subreddit}"):
         print_substep("The 'results' folder could not be found so it was automatically created.")

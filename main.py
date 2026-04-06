@@ -6,9 +6,7 @@ from pathlib import Path
 from subprocess import Popen
 from typing import Dict, NoReturn
 
-from prawcore import ResponseException
-
-from reddit.subreddit import get_subreddit_threads
+from platforms import get_content_object, get_screenshot_fn
 from utils import settings
 from utils.cleanup import cleanup
 from utils.console import print_markdown, print_step, print_substep
@@ -22,8 +20,13 @@ from video_creation.background import (
     get_background_config,
 )
 from video_creation.final_video import make_final_video
-from video_creation.screenshot_downloader import get_screenshots_of_reddit_posts
 from video_creation.voices import save_text_to_mp3
+
+# Guard prawcore import — only available when Reddit is used
+try:
+    from prawcore import ResponseException as _PrawResponseException
+except ImportError:
+    _PrawResponseException = None
 
 __VERSION__ = "3.4.0"
 
@@ -46,14 +49,24 @@ reddit_id: str
 reddit_object: Dict[str, str | list]
 
 
+def _get_platform_post_id(config: dict, platform: str) -> str:
+    """Returns the post_id string from config for the active platform."""
+    if platform == "reddit":
+        return config.get("reddit", {}).get("thread", {}).get("post_id", "")
+    elif platform == "threads":
+        return config.get("threads", {}).get("thread", {}).get("post_id", "")
+    return ""
+
+
 def main(POST_ID=None) -> None:
     global reddit_id, reddit_object
-    reddit_object = get_subreddit_threads(POST_ID)
+    reddit_object = get_content_object(POST_ID)
     reddit_id = extract_id(reddit_object)
     print_substep(f"Thread ID is {reddit_id}", style="bold blue")
     length, number_of_comments = save_text_to_mp3(reddit_object)
     length = math.ceil(length)
-    get_screenshots_of_reddit_posts(reddit_object, number_of_comments)
+    screenshot_fn = get_screenshot_fn()
+    screenshot_fn(reddit_object, number_of_comments)
     bg_config = {
         "video": get_background_config("video"),
         "audio": get_background_config("audio"),
@@ -105,11 +118,15 @@ if __name__ == "__main__":
         )
         sys.exit()
     try:
-        if config["reddit"]["thread"]["post_id"]:
-            for index, post_id in enumerate(config["reddit"]["thread"]["post_id"].split("+")):
+        platform = config["settings"].get("platform", "reddit")
+        post_id_str = _get_platform_post_id(config, platform)
+
+        if post_id_str:
+            for index, post_id in enumerate(post_id_str.split("+")):
                 index += 1
+                num_posts = len(post_id_str.split("+"))
                 print_step(
-                    f'on the {index}{("st" if index % 10 == 1 else ("nd" if index % 10 == 2 else ("rd" if index % 10 == 3 else "th")))} post of {len(config["reddit"]["thread"]["post_id"].split("+"))}'
+                    f'on the {index}{("st" if index % 10 == 1 else ("nd" if index % 10 == 2 else ("rd" if index % 10 == 3 else "th")))} post of {num_posts}'
                 )
                 main(post_id)
                 Popen("cls" if name == "nt" else "clear", shell=True).wait()
@@ -119,11 +136,13 @@ if __name__ == "__main__":
             main()
     except KeyboardInterrupt:
         shutdown()
-    except ResponseException:
-        print_markdown("## Invalid credentials")
-        print_markdown("Please check your credentials in the config.toml file")
-        shutdown()
     except Exception as err:
+        # Handle Reddit-specific credential errors if prawcore is available
+        if _PrawResponseException and isinstance(err, _PrawResponseException):
+            print_markdown("## Invalid Reddit credentials")
+            print_markdown("Please check your credentials in the config.toml file")
+            shutdown()
+        # Generic error handling for all other exceptions
         config["settings"]["tts"]["tiktok_sessionid"] = "REDACTED"
         config["settings"]["tts"]["elevenlabs_api_key"] = "REDACTED"
         config["settings"]["tts"]["openai_api_key"] = "REDACTED"

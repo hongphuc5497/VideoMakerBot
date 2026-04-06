@@ -1,10 +1,12 @@
 import json
 import time
-
-from praw.models import Submission
+from typing import TYPE_CHECKING
 
 from utils import settings
 from utils.console import print_step
+
+if TYPE_CHECKING:
+    from praw.models import Submission
 
 
 def check_done(
@@ -58,3 +60,19 @@ def save_data(subreddit: str, filename: str, reddit_title: str, reddit_id: str, 
         done_vids.append(payload)
         raw_vids.seek(0)
         json.dump(done_vids, raw_vids, ensure_ascii=False, indent=4)
+
+
+def check_done_by_id(post_id: str) -> bool:
+    """Returns True if a video for this post_id has already been generated.
+
+    Platform-agnostic version of check_done, used by non-Reddit platforms.
+
+    Args:
+        post_id (str): The unique post ID from any platform
+
+    Returns:
+        bool: True if video already exists, False otherwise
+    """
+    with open("./video_creation/data/videos.json", "r", encoding="utf-8") as f:
+        done_videos = json.load(f)
+    return any(video["id"] == str(post_id) for video in done_videos)

@@ -179,7 +179,8 @@ class TTSEngine:
 
 
 def process_text(text: str, clean: bool = True):
-    lang = settings.config["reddit"]["thread"]["post_lang"]
+    lang = (settings.config["settings"].get("post_lang") or
+            settings.config.get("reddit", {}).get("thread", {}).get("post_lang", ""))
     new_text = sanitize_text(text) if clean else text
     if lang:
         print_substep("Translating Text...")
