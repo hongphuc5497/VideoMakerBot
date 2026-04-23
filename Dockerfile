@@ -1,12 +1,27 @@
-FROM python:3.10.14-slim
+FROM python:3.10-slim-bookworm
 
-RUN apt update
-RUN apt-get install -y ffmpeg
-RUN apt install python3-pip -y
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
-RUN mkdir /app
-ADD . /app
 WORKDIR /app
-RUN pip install -r requirements.txt
 
-CMD ["python3", "main.py"]
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        ffmpeg \
+        curl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt ./
+RUN pip install --upgrade pip \
+    && pip install -r requirements.txt \
+    && python -m spacy download en_core_web_sm
+
+RUN python -m playwright install --with-deps chromium
+
+COPY . .
+
+RUN chmod +x /app/docker-entrypoint.sh
+
+ENTRYPOINT ["/bin/sh", "/app/docker-entrypoint.sh"]

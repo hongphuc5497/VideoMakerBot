@@ -34,6 +34,7 @@ The only original thing being done is the editing and gathering of all materials
 
 - Python 3.10
 - Playwright (this should install automatically in installation)
+- Docker and Docker Compose for the container workflow
 
 ## Installation 👩‍💻
 
@@ -65,6 +66,44 @@ The only original thing being done is the editing and gathering of all materials
     python -m playwright install
     python -m playwright install-deps
     ```
+
+## Docker
+
+The repository now includes a shared image plus Compose services for the GUI and CLI.
+
+Build the image:
+
+```sh
+docker compose build
+```
+
+Start the GUI:
+
+```sh
+docker compose up gui
+```
+
+Open `http://localhost:4000` in your browser.
+
+Run the CLI pipeline:
+
+```sh
+docker compose run --rm cli
+```
+
+Run the CLI for a specific post:
+
+```sh
+docker compose run --rm cli python main.py <post_id>
+```
+
+Stop the GUI and remove the Compose stack:
+
+```sh
+docker compose down
+```
+
+The repo root is bind-mounted into the container so `config.toml`, `results/`, `assets/temp/`, and the runtime JSON files persist across rebuilds and repeated runs.
 
 ---
 

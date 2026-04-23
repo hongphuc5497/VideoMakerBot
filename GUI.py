@@ -1,3 +1,4 @@
+import os
 import webbrowser
 from pathlib import Path
 
@@ -13,11 +14,15 @@ from flask import (
 )
 
 import utils.gui_utils as gui
+from utils.docker_bootstrap import ensure_runtime_state
 
-# Set the hostname
-HOST = "localhost"
-# Set the port number
-PORT = 4000
+ensure_runtime_state()
+
+# Set the hostname and port
+HOST = os.environ.get("GUI_HOST", "0.0.0.0")
+PORT = int(os.environ.get("GUI_PORT", "4000"))
+OPEN_BROWSER = os.environ.get("GUI_OPEN_BROWSER", "1").lower() in {"1", "true", "yes", "on"}
+BROWSER_URL = os.environ.get("GUI_BROWSER_URL", f"http://localhost:{PORT}")
 
 # Configure application
 app = Flask(__name__, template_folder="GUI")
@@ -111,6 +116,7 @@ def voices(name):
 
 # Run browser and start the app
 if __name__ == "__main__":
-    webbrowser.open(f"http://{HOST}:{PORT}", new=2)
-    print("Website opened in new tab. Refresh if it didn't load.")
-    app.run(port=PORT)
+    if OPEN_BROWSER:
+        webbrowser.open(BROWSER_URL, new=2)
+        print("Website opened in new tab. Refresh if it didn't load.")
+    app.run(host=HOST, port=PORT)

@@ -1,0 +1,27 @@
+services:
+  gui:
+    build:
+      context: .
+    image: videomakerbot:latest
+    command: ["python", "GUI.py"]
+    ports:
+      - "4000:4000"
+    environment:
+      GUI_HOST: "0.0.0.0"
+      GUI_PORT: "4000"
+      GUI_OPEN_BROWSER: "0"
+      GUI_BROWSER_URL: "http://localhost:4000"
+    volumes:
+      - ./:/app
+    shm_size: "1gb"
+
+  cli:
+    build:
+      context: .
+    image: videomakerbot:latest
+    command: ["python", "main.py"]
+    environment:
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - ./:/app
+    shm_size: "1gb"

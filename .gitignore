@@ -242,7 +242,11 @@ reddit-bot-351418-5560ebc49cac.json
 /.idea
 *.pyc
 video_creation/data/videos.json
+video_creation/data/cookie-threads.json
 video_creation/data/envvars.txt
+utils/backgrounds.json
 
 config.toml
 *.exe
+
+.omx

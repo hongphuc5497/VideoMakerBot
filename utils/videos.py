@@ -10,8 +10,8 @@ if TYPE_CHECKING:
 
 
 def check_done(
-    redditobj: Submission,
-) -> Submission:
+    redditobj: "Submission",
+) -> "Submission":
     # don't set this to be run anyplace that isn't subreddit.py bc of inspect stack
     """Checks if the chosen post has already been generated
 
