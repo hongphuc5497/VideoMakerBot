@@ -4,7 +4,7 @@ import sys
 from os import name
 from pathlib import Path
 from subprocess import Popen
-from typing import Dict, NoReturn
+from typing import Dict, NoReturn, Union
 
 from platforms import get_content_object, get_screenshot_fn
 from utils import settings
@@ -46,7 +46,7 @@ print_markdown(
 checkversion(__VERSION__)
 
 reddit_id: str
-reddit_object: Dict[str, str | list]
+reddit_object: Dict[str, Union[str, list]]
 
 
 def _get_platform_post_id(config: dict, platform: str) -> str:
@@ -96,9 +96,9 @@ def shutdown() -> NoReturn:
 
 
 if __name__ == "__main__":
-    if sys.version_info.major != 3 or sys.version_info.minor not in [10, 11, 12]:
+    if sys.version_info.major != 3 or sys.version_info.minor < 10:
         print(
-            "Hey! Congratulations, you've made it so far (which is pretty rare with no Python 3.10). Unfortunately, this program only works on Python 3.10. Please install Python 3.10 and try again."
+            "Hey! Congratulations, you've made it so far (which is pretty rare with no Python 3.10). Unfortunately, this program requires Python 3.10 or later. Please install Python 3.10+ and try again."
         )
         sys.exit()
     ffmpeg_install()

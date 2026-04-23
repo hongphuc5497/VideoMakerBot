@@ -104,11 +104,10 @@ class TTSEngine:
 
     def split_post(self, text: str, idx):
         split_files = []
+        pattern = r" *(((.|\n){0," + str(self.tts_module.max_chars) + r"})(\.|.$))"
         split_text = [
             x.group().strip()
-            for x in re.finditer(
-                r" *(((.|\n){0," + str(self.tts_module.max_chars) + "})(\.|.$))", text
-            )
+            for x in re.finditer(pattern, text)
         ]
         self.create_silence_mp3()
 
