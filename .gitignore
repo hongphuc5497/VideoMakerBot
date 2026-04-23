@@ -250,3 +250,4 @@ config.toml
 *.exe
 
 .omx
+.gitnexus
