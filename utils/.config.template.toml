@@ -4,6 +4,7 @@ client_secret = { optional = false, nmin = 20, nmax = 40, explanation = "The SEC
 username = { optional = false, nmin = 3, nmax = 20, explanation = "The username of your reddit account", example = "JasonLovesDoggo", regex = "^[-_0-9a-zA-Z]+$", oob_error = "A username HAS to be between 3 and 20 characters" }
 password = { optional = false, nmin = 8, explanation = "The password of your reddit account", example = "fFAGRNJru1FTz70BzhT3Zg", oob_error = "Password too short" }
 2fa = { optional = true, type = "bool", options = [true, false, ], default = false, explanation = "Whether you have Reddit 2FA enabled, Valid options are True and False", example = true }
+2fa_secret = { optional = true, default = "", explanation = "TOTP shared secret (base32). If provided, 2FA codes are generated automatically instead of prompting interactively.", example = "JBSWY3DPEHPK3PXP" }
 
 
 [reddit.thread]
@@ -32,6 +33,13 @@ max_reply_length = { default = 500, optional = false, nmin = 10, nmax = 10000, t
 min_reply_length = { default = 1, optional = true, nmin = 0, nmax = 10000, type = "int", explanation = "Min characters per reply", example = 1, oob_error = "Min reply length should be between 0 and 10000" }
 min_replies = { default = 5, optional = false, nmin = 1, type = "int", explanation = "Minimum number of replies for a post to be eligible", example = 5, oob_error = "Minimum replies should be at least 1" }
 blocked_words = { optional = true, default = "", type = "str", explanation = "Comma-separated list of blocked words/phrases. Posts and replies containing any of these will be skipped.", example = "nsfw, spoiler, politics" }
+
+[youtube]
+enabled = { optional = true, type = "bool", default = false, options = [true, false], explanation = "Enable automatic YouTube upload after video creation" }
+privacy = { optional = true, default = "public", options = ["public", "private", "unlisted"], explanation = "YouTube video privacy status" }
+category = { optional = true, default = "22", explanation = "YouTube category ID (22 = People & Blogs)" }
+tags = { optional = true, default = "shorts, reddit", explanation = "Comma-separated tags for the video" }
+client_secret_path = { optional = true, default = "", explanation = "Path to youtube_client_secret.json for OAuth2 authentication" }
 
 [settings]
 platform = { optional = false, default = "reddit", options = ["reddit", "threads"], explanation = "Which social media platform to pull content from." }

@@ -19,8 +19,9 @@ from video_creation.background import (
     download_background_video,
     get_background_config,
 )
-from video_creation.final_video import make_final_video
+from video_creation.final_video import make_final_video, name_normalize
 from video_creation.voices import save_text_to_mp3
+from video_creation.youtube_uploader import upload_to_youtube
 
 # Guard prawcore import — only available when Reddit is used
 try:
@@ -76,6 +77,32 @@ def main(POST_ID=None) -> None:
     chop_background(bg_config, length, reddit_object)
     make_final_video(number_of_comments, length, reddit_object, bg_config)
 
+    # -- YouTube upload (if enabled in config) ---------------------------
+    youtube_config = settings.config.get("youtube", {})
+    if youtube_config.get("enabled", False):
+        # Compute the video path using the same logic as final_video.py
+        title_raw = reddit_object.get("thread_title", "video")
+        filename = f"{name_normalize(title_raw)[:251]}"
+        platform = settings.config["settings"].get("platform", "reddit")
+        if platform == "reddit":
+            subreddit = (
+                settings.config.get("reddit", {})
+                .get("thread", {})
+                .get("subreddit", "unknown")
+            )
+        else:
+            subreddit = reddit_object.get("thread_category", platform)
+        video_path = f"results/{subreddit}/{filename}.mp4"
+
+        youtube_url = upload_to_youtube(
+            video_path, title_raw, settings.config
+        )
+        if youtube_url:
+            print_substep(f"YouTube URL: {youtube_url}", "bold green")
+        else:
+            print_substep("YouTube upload skipped or failed.", "yellow")
+    # ---------------------------------------------------------------------
+
 
 def run_many(times) -> None:
     for x in range(1, times + 1):
@@ -113,10 +140,12 @@ if __name__ == "__main__":
         or settings.config["settings"]["tts"]["tiktok_sessionid"] == ""
     ) and config["settings"]["tts"]["voice_choice"] == "tiktok":
         print_substep(
-            "TikTok voice requires a sessionid! Check our documentation on how to obtain one.",
-            "bold red",
+            "TikTok voice requires a sessionid! "
+            "Falling back to pyttsx3 (offline TTS, no API key needed). "
+            "Set a valid tiktok_sessionid in your config.toml to use TikTok voices.",
+            "bold yellow",
         )
-        sys.exit()
+        config["settings"]["tts"]["voice_choice"] = "pyttsx"
     try:
         platform = config["settings"].get("platform", "reddit")
         post_id_str = _get_platform_post_id(config, platform)

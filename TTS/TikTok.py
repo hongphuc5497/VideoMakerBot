@@ -80,10 +80,15 @@ class TikTok:
     """TikTok Text-to-Speech Wrapper"""
 
     def __init__(self):
+        sessionid = (
+            settings.config.get("settings", {})
+            .get("tts", {})
+            .get("tiktok_sessionid", "")
+        )
         headers = {
             "User-Agent": "com.zhiliaoapp.musically/2022600030 (Linux; U; Android 7.1.2; es_ES; SM-G988N; "
             "Build/NRD90M;tt-ok/3.12.13.1)",
-            "Cookie": f"sessionid={settings.config['settings']['tts']['tiktok_sessionid']}",
+            "Cookie": f"sessionid={sessionid}",
         }
 
         self.URI_BASE = "https://api16-normal-c-useast1a.tiktokv.com/media/api/text/speech/invoke/"
@@ -94,33 +99,35 @@ class TikTok:
         self._session.headers = headers
 
     def run(self, text: str, filepath: str, random_voice: bool = False):
-        if random_voice:
-            voice = self.random_voice()
-        else:
-            # if tiktok_voice is not set in the config file, then use a random voice
-            voice = settings.config["settings"]["tts"].get("tiktok_voice", None)
-
-        # get the audio from the TikTok API
-        data = self.get_voices(voice=voice, text=text)
-
-        # check if there was an error in the request
-        status_code = data["status_code"]
-        if status_code != 0:
-            raise TikTokTTSException(status_code, data["message"])
-
-        # decode data from base64 to binary
         try:
-            raw_voices = data["data"]["v_str"]
-        except:
-            print(
-                "The TikTok TTS returned an invalid response. Please try again later, and report this bug."
-            )
-            raise TikTokTTSException(0, "Invalid response")
-        decoded_voices = base64.b64decode(raw_voices)
+            if random_voice:
+                voice = self.random_voice()
+            else:
+                # if tiktok_voice is not set in the config file, then use a random voice
+                voice = settings.config["settings"]["tts"].get("tiktok_voice", None)
 
-        # write voices to specified filepath
-        with open(filepath, "wb") as out:
-            out.write(decoded_voices)
+            # get the audio from the TikTok API
+            data = self.get_voices(voice=voice, text=text)
+
+            # check if there was an error in the request
+            status_code = data["status_code"]
+            if status_code != 0:
+                raise TikTokTTSException(status_code, data["message"])
+
+            # decode data from base64 to binary
+            try:
+                raw_voices = data["data"]["v_str"]
+            except (KeyError, TypeError):
+                raise TikTokTTSException(0, "Invalid response: missing v_str field")
+            decoded_voices = base64.b64decode(raw_voices)
+
+            # write voices to specified filepath
+            with open(filepath, "wb") as out:
+                out.write(decoded_voices)
+        except TikTokTTSException:
+            raise  # Re-raise TikTok-specific errors as-is
+        except Exception as err:
+            raise TikTokTTSException(0, f"Unexpected error in TikTok TTS: {err}")
 
     def get_voices(self, text: str, voice: Optional[str] = None) -> dict:
         """If voice is not passed, the API will try to use the most fitting voice"""
@@ -136,11 +143,17 @@ class TikTok:
         # send request
         try:
             response = self._session.post(self.URI_BASE, params=params)
-        except ConnectionError:
+        except requests.RequestException:
             time.sleep(random.randrange(1, 7))
-            response = self._session.post(self.URI_BASE, params=params)
+            try:
+                response = self._session.post(self.URI_BASE, params=params)
+            except requests.RequestException as err:
+                raise TikTokTTSException(0, f"Network error contacting TikTok API: {err}")
 
-        return response.json()
+        try:
+            return response.json()
+        except ValueError as err:
+            raise TikTokTTSException(0, f"Invalid JSON response from TikTok API: {err}")
 
     @staticmethod
     def random_voice() -> str:

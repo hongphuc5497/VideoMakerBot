@@ -22,11 +22,23 @@ def get_subreddit_threads(POST_ID: str):
 
     content = {}
     if settings.config["reddit"]["creds"]["2fa"]:
-        print("\nEnter your two-factor authentication code from your authenticator app.\n")
-        code = input("> ")
-        print()
-        pw = settings.config["reddit"]["creds"]["password"]
-        passkey = f"{pw}:{code}"
+        twofa_secret = settings.config["reddit"]["creds"].get("2fa_secret", "")
+        if twofa_secret:
+            import pyotp
+
+            totp = pyotp.TOTP(twofa_secret)
+            code = totp.now()
+            pw = settings.config["reddit"]["creds"]["password"]
+            passkey = f"{pw}:{code}"
+        else:
+            print(
+                "\nEnter your two-factor authentication code from your authenticator app.\n"
+                "(To skip this prompt in the future, set 2fa_secret in config.toml)\n"
+            )
+            code = input("> ")
+            print()
+            pw = settings.config["reddit"]["creds"]["password"]
+            passkey = f"{pw}:{code}"
     else:
         passkey = settings.config["reddit"]["creds"]["password"]
     username = settings.config["reddit"]["creds"]["username"]
