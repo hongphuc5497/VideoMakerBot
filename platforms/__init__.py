@@ -26,8 +26,13 @@ def get_content_object(POST_ID=None) -> dict:
         return get_subreddit_threads(POST_ID)
 
     elif platform == "threads":
-        from platforms.threads.fetcher import get_threads_content
-        return get_threads_content(POST_ID)
+        discovery = settings.config.get("threads", {}).get("discovery_method", "api")
+        if discovery == "scrape":
+            from platforms.threads.scraper import get_trending_threads_content
+            return get_trending_threads_content(POST_ID)
+        else:
+            from platforms.threads.fetcher import get_threads_content
+            return get_threads_content(POST_ID)
 
     else:
         raise ValueError(

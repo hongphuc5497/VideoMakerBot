@@ -1,60 +1,14 @@
 """Captures screenshots of Threads posts via Playwright."""
 
-import json
 import re
 from pathlib import Path
 from typing import Final
 
 from playwright.sync_api import ViewportSize, sync_playwright
 
+from platforms.threads.auth import ensure_authenticated_context
 from utils import settings
 from utils.console import print_step, print_substep
-
-
-THREADS_LOGIN_URL = "https://www.threads.net/login"
-THREADS_COOKIE_FILE = "./video_creation/data/cookie-threads.json"
-
-
-def _login_to_threads(page, context) -> None:
-    """
-    Performs Threads login via Instagram credentials (Threads uses Instagram auth).
-    Saves session cookies to cookie-threads.json for reuse on future runs.
-
-    Args:
-        page: Playwright page object
-        context: Playwright browser context
-
-    Raises:
-        RuntimeError: If login credentials are not configured.
-    """
-    username = settings.config["threads"]["creds"].get("username", "").strip()
-    password = settings.config["threads"]["creds"].get("password", "").strip()
-
-    if not username or not password:
-        raise RuntimeError(
-            "Threads screenshot login requires credentials. "
-            "Set threads.creds.username and threads.creds.password in config.toml"
-        )
-
-    print_substep("Logging into Threads (via Instagram)...")
-    page.goto(THREADS_LOGIN_URL, timeout=0)
-    page.wait_for_load_state("networkidle")
-
-    # Threads login form uses Instagram auth with these selectors
-    page.locator('input[autocomplete="username"]').fill(username)
-    page.locator('input[autocomplete="current-password"]').fill(password)
-    page.get_by_role("button", name="Log in").click()
-
-    # Wait for login to complete
-    page.wait_for_timeout(6000)
-
-    # Persist cookies for reuse
-    cookies = context.cookies()
-    Path(THREADS_COOKIE_FILE).parent.mkdir(parents=True, exist_ok=True)
-    with open(THREADS_COOKIE_FILE, "w") as f:
-        json.dump(cookies, f)
-
-    print_substep("Logged into Threads and saved session cookies.", style="bold green")
 
 
 def get_screenshots_of_threads_posts(content_object: dict, screenshot_num: int) -> None:
@@ -89,36 +43,12 @@ def get_screenshots_of_threads_posts(content_object: dict, screenshot_num: int) 
     with sync_playwright() as p:
         print_substep("Launching headless browser...")
         browser = p.chromium.launch(headless=True)
-        context = browser.new_context(
-            locale="en-US",
+        context = ensure_authenticated_context(
+            browser,
             color_scheme="dark" if theme == "dark" else "light",
             viewport=ViewportSize(width=W, height=H),
             device_scale_factor=dsf,
-            user_agent=(
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/120.0.0.0 Safari/537.36"
-            ),
         )
-
-        # Try to load saved cookies; if not found or invalid, do a fresh login
-        cookie_path = Path(THREADS_COOKIE_FILE)
-        if cookie_path.exists():
-            try:
-                with open(cookie_path, encoding="utf-8") as f:
-                    saved_cookies = json.load(f)
-                context.add_cookies(saved_cookies)
-                print_substep("Loaded saved Threads session cookies.")
-            except (json.JSONDecodeError, IOError):
-                print_substep("Saved cookies corrupted. Logging in fresh...")
-                page = context.new_page()
-                _login_to_threads(page, context)
-                page.close()
-        else:
-            print_substep("No saved cookies found. Logging in...")
-            page = context.new_page()
-            _login_to_threads(page, context)
-            page.close()
 
         # Screenshot the main post
         page = context.new_page()
@@ -128,13 +58,21 @@ def get_screenshots_of_threads_posts(content_object: dict, screenshot_num: int) 
 
         postcontentpath = f"assets/temp/{thread_id}/png/title.png"
         try:
-            # On Threads.net post permalink pages, the main post is the first article element
-            post_locator = page.locator("article").first
-            if not post_locator.is_visible():
-                raise RuntimeError(
-                    "Main post article not found on page. "
-                    "Check if you're logged in correctly or if the post is deleted."
-                )
+            # Threads.net uses div-based cards, not <article> elements.
+            # Find the first post link and screenshot its parent card.
+            post_link = page.locator('a[href*="/post/"]').first
+            if post_link.count() and post_link.is_visible():
+                # Screenshot the card container, or fall back to the link's parent
+                card = post_link.locator('xpath=ancestor::div[contains(@class, "x1a2a7pz")][1]')
+                if card.count():
+                    post_locator = card.first
+                else:
+                    post_locator = post_link
+            else:
+                # Fallback: try article (older Threads layout) or full page
+                post_locator = page.locator("article").first
+                if not post_locator.count() or not post_locator.is_visible():
+                    post_locator = page.locator("body")
 
             if settings.config["settings"].get("zoom", 1) != 1:
                 zoom = settings.config["settings"]["zoom"]
@@ -163,10 +101,16 @@ def get_screenshots_of_threads_posts(content_object: dict, screenshot_num: int) 
                     page.wait_for_load_state("networkidle")
                     page.wait_for_timeout(2000)
 
-                    # Each reply permalink page shows that reply as the first article
-                    reply_locator = page.locator("article").first
-                    if not reply_locator.is_visible():
-                        print_substep(f"Reply {idx} article not found. Skipping...", style="yellow")
+                    # Threads.net uses div-based cards for replies too.
+                    # Find the first post link and screenshot its card container.
+                    reply_link = page.locator('a[href*="/post/"]').first
+                    if reply_link.count() and reply_link.is_visible():
+                        card = reply_link.locator('xpath=ancestor::div[contains(@class, "x1a2a7pz")][1]')
+                        reply_locator = card.first if card.count() else reply_link
+                    else:
+                        reply_locator = page.locator("article").first
+                    if not reply_locator.count() or not reply_locator.is_visible():
+                        print_substep(f"Reply {idx} not found. Skipping...", style="yellow")
                         continue
 
                     if settings.config["settings"].get("zoom", 1) != 1:

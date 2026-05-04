@@ -21,6 +21,9 @@ blocked_words = { optional = true, default = "", type = "str", explanation = "Co
 ai_similarity_enabled = {optional = true, option = [true, false], default = false, type = "bool", explanation = "Threads read from Reddit are sorted based on their similarity to the keywords given below"}
 ai_similarity_keywords = {optional = true, type="str", example= 'Elon Musk, Twitter, Stocks', explanation = "Every keyword or even sentence, seperated with comma, is used to sort the reddit threads based on similarity"}
 
+[threads]
+discovery_method = { optional = true, default = "api", options = ["api", "scrape"], type = "str", explanation = "How to discover Threads content: 'api' uses Graph API (your own posts), 'scrape' uses web scraping (trending ForYou feed). Requires threads.creds.username/password for Playwright login." }
+
 [threads.creds]
 access_token = { optional = false, explanation = "Meta Threads long-lived user access token (User token from Graph API, valid for 60 days)", example = "EAABsbCS..." }
 user_id = { optional = false, explanation = "Numeric Threads user ID", example = "12345678901234567" }
@@ -32,6 +35,9 @@ post_id = { optional = true, default = "", regex = "^((?!://|://)[+a-zA-Z0-9])*$
 max_reply_length = { default = 500, optional = false, nmin = 10, nmax = 10000, type = "int", explanation = "Max characters per reply", example = 500, oob_error = "Max reply length should be between 10 and 10000" }
 min_reply_length = { default = 1, optional = true, nmin = 0, nmax = 10000, type = "int", explanation = "Min characters per reply", example = 1, oob_error = "Min reply length should be between 0 and 10000" }
 min_replies = { default = 5, optional = false, nmin = 1, type = "int", explanation = "Minimum number of replies for a post to be eligible", example = 5, oob_error = "Minimum replies should be at least 1" }
+min_engagement = { default = 0, optional = true, nmin = 0, type = "int", explanation = "Minimum total engagement (likes + reposts) to consider a post viral. Set to 0 to disable. Example: 10000 means only posts with 10K+ total likes+reposts.", example = 10000 }
+max_post_age = { optional = true, default = "", options = ["", "1h", "6h", "24h", "3d", "7d", "30d"], type = "str", explanation = "Maximum age of posts to consider. Empty = no limit.", example = "7d" }
+search_queries = { optional = true, default = "news,politics,trending", type = "str", explanation = "Comma-separated search queries to find trending content on Threads. Combined with main feed results.", example = "news,politics,viral" }
 blocked_words = { optional = true, default = "", type = "str", explanation = "Comma-separated list of blocked words/phrases. Posts and replies containing any of these will be skipped.", example = "nsfw, spoiler, politics" }
 
 [youtube]
@@ -58,7 +64,7 @@ zoom = { optional = true, default = 1, example = 1.1, explanation = "Sets the br
 channel_name = { optional = true, default = "Reddit Tales", example = "Reddit Stories", explanation = "Sets the channel name for the video" }
 
 [settings.background]
-background_video = { optional = true, default = "minecraft", example = "rocket-league", options = ["minecraft", "gta", "rocket-league", "motor-gta", "csgo-surf", "cluster-truck", "minecraft-2","multiversus","fall-guys","steep", ""], explanation = "Sets the background for the video based on game name" }
+background_video = { optional = true, default = "minecraft", example = "rocket-league", options = ["minecraft", "gta", "rocket-league", "motor-gta", "csgo-surf", "cluster-truck", "minecraft-2","multiversus","fall-guys","steep", "black", ""], explanation = "Sets the background for the video based on game name" }
 background_audio = { optional = true, default = "lofi", example = "chill-summer", options = ["lofi","lofi-2","chill-summer",""], explanation = "Sets the background audio for the video" }
 background_audio_volume = { optional = true, type = "float", nmin = 0, nmax = 1, default = 0.15, example = 0.05, explanation="Sets the volume of the background audio. If you don't want background audio, set it to 0.", oob_error = "The volume HAS to be between 0 and 1", input_error = "The volume HAS to be a float number between 0 and 1"}
 enable_extra_audio = { optional = true, type = "bool", default = false, example = false, explanation="Used if you want to render another video without background audio in a separate folder", input_error = "The value HAS to be true or false"}

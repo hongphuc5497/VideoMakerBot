@@ -6,7 +6,7 @@
 
 **Status:** Production-ready, actively maintained (v3.4.0)
 **Language:** Python 3.10+
-**Platforms:** Reddit (original), Threads (NEW), X/Twitter (planned)
+**Platforms:** Reddit (PRAW API), Threads (Graph API + Web Scraping)
 
 ### Core Mission
 Transforms social media threads (post + comments/replies) into complete short-form videos with:
@@ -14,6 +14,7 @@ Transforms social media threads (post + comments/replies) into complete short-fo
 - UI screenshots (Playwright)
 - Background video/audio overlays
 - FFmpeg composition & output
+- Optional YouTube upload
 
 ---
 
@@ -23,59 +24,44 @@ Transforms social media threads (post + comments/replies) into complete short-fo
 main.py (CLI)
     ↓ [platform factory]
     ├─→ reddit/subreddit.py [PRAW API]
-    └─→ platforms/threads/fetcher.py [Graph API]
-        ↓ [standard data dict]
-        ├─→ TTS/engine_wrapper.py [7+ providers]
-        ├─→ screenshot_downloader.py (Reddit)
-        │   or platforms/threads/screenshot.py (Threads)
-        ├─→ video_creation/background.py
-        └─→ video_creation/final_video.py [FFmpeg]
-            ↓
-            results/{category}/{video.mp4}
+    └─→ platforms/threads/
+        ├─→ fetcher.py [Graph API — your own posts]
+        ├─→ scraper.py [Web scraping — trending For You feed]
+        └─→ auth.py [Shared Playwright login + cookies]
+            ↓ [standard data dict]
+            ├─→ TTS/engine_wrapper.py [7+ providers, auto-fallback]
+            ├─→ screenshot_downloader.py (Reddit)
+            │   or platforms/threads/screenshot.py (Threads)
+            ├─→ video_creation/background.py [local or yt-dlp]
+            ├─→ video_creation/youtube_uploader.py [optional auto-upload]
+            └─→ video_creation/final_video.py [FFmpeg with libx264]
+                ↓
+                results/{category}/{video.mp4}
 ```
-
-### Key Design: Platform Abstraction via Factory Pattern
-
-**Why:** Single codebase supports multiple platforms without tight coupling.
-
-**How:** `platforms/__init__.py` exports:
-- `get_content_object(POST_ID=None)` — routes to right fetcher
-- `get_screenshot_fn()` — routes to right screenshotter
-
-**Result:** Adding X/Twitter requires only: new module + config section + two `elif` branches.
 
 ---
 
 ## Data Contract: The "content_object" Dict
 
-All fetchers return this shape (defined in `platforms/__init__.py`):
+All fetchers return this shape:
 
 ```python
 {
-    # Unique identifiers
     "thread_id":       str,           # Used for temp folder: assets/temp/{id}/
-    "thread_category": str,           # "reddit", "threads", etc. → output folder
-
-    # Content
-    "thread_title":    str,           # TTS as title + output filename
+    "thread_category": str,           # "reddit", "threads" → output folder
+    "thread_title":    str,           # TTS + output filename (clean, no metadata)
     "thread_url":      str,           # Playwright navigates here for screenshot
-    "is_nsfw":         bool,          # Content filter flag
-
-    # Replies/Comments (mutually exclusive with thread_post)
+    "is_nsfw":         bool,
     "comments": [
         {
-            "comment_body": str,      # TTS per reply
+            "comment_body": str,      # TTS per reply (clean body text)
             "comment_url":  str,      # Playwright navigates here
-            "comment_id":   str,      # CSS selector ID or unique identifier
+            "comment_id":   str,      # Unique identifier (URL-based for scraper)
         }
     ],
-
-    # OR Story mode:
-    "thread_post":     str | list,    # Long-form text (no comments)
+    "thread_post":     str | list,    # Story mode (no comments)
 }
 ```
-
-**Why:** Loose coupling—TTS, backgrounds, and video composition don't need platform-specific logic.
 
 ---
 
@@ -83,102 +69,75 @@ All fetchers return this shape (defined in `platforms/__init__.py`):
 
 ```
 VideoMakerBot/
-├── platforms/                      # Multi-platform abstraction
-│   ├── __init__.py                # Factory: get_content_object(), get_screenshot_fn()
-│   └── threads/                   # Threads (Meta) implementation
-│       ├── fetcher.py             # Graph API → content_object
-│       └── screenshot.py          # Playwright Threads screenshotter
+├── platforms/
+│   ├── __init__.py                    # Factory: get_content_object(), get_screenshot_fn()
+│   └── threads/
+│       ├── auth.py                    # Shared Playwright login + cookie management
+│       ├── fetcher.py                 # Graph API → content_object (your own posts)
+│       ├── scraper.py                 # Web scraping → content_object (trending feed)
+│       └── screenshot.py             # Playwright Threads screenshotter (div-based)
 │
-├── reddit/                        # Reddit implementation (kept as-is)
-│   └── subreddit.py              # PRAW API → content_object + thread_category
+├── reddit/
+│   └── subreddit.py                  # PRAW API → content_object
 │
 ├── video_creation/
-│   ├── final_video.py            # FFmpeg composition (platform-aware folder naming)
-│   ├── screenshot_downloader.py  # Playwright Reddit UI capturer
-│   ├── voices.py                 # TTS orchestrator (platform-agnostic)
-│   ├── background.py             # Video/audio downloader (platform-agnostic)
-│   └── data/
-│       ├── videos.json           # Dedup tracker
-│       ├── cookie-dark-mode.json # Reddit theme cookie
-│       └── cookie-threads.json   # Threads session cookie (auto-created)
+│   ├── final_video.py                # FFmpeg composition (libx264, no drawtext on macOS)
+│   ├── background.py                 # Video/audio downloader (local files or yt-dlp)
+│   ├── screenshot_downloader.py      # Playwright Reddit UI capturer
+│   ├── voices.py                     # TTS orchestrator
+│   └── youtube_uploader.py           # YouTube OAuth2 upload (post-render hook)
 │
-├── TTS/                          # Text-to-Speech
-│   ├── engine_wrapper.py         # Provider abstraction + post_lang fallback
-│   ├── elevenlabs.py, aws_polly.py, etc. # 7+ provider implementations
+├── TTS/
+│   ├── engine_wrapper.py             # Provider abstraction + TikTok→pyttsx3 fallback
+│   ├── TikTok.py                     # TikTok TTS (hardened error handling)
+│   └── ...                           # 7+ provider implementations
 │
 ├── utils/
-│   ├── settings.py               # Config loading + validation
-│   ├── videos.py                 # check_done() + check_done_by_id()
-│   ├── console.py                # Rich terminal output
-│   ├── .config.template.toml     # Config schema (platform sections)
-│   └── ... (id, voice, cleanup, etc.)
+│   ├── settings.py                   # Config loading + interactive validation
+│   ├── videos.py                     # check_done() + check_done_by_id()
+│   ├── console.py                    # Rich terminal output
+│   ├── .config.template.toml         # Config schema
+│   ├── background_videos.json        # Background video manifest
+│   ├── background_audios.json        # Background audio manifest
+│   └── ...
 │
-├── main.py                       # CLI entry (platform-routed via factory)
-├── GUI.py                        # Flask web UI (localhost:4000)
-├── requirements.txt              # Dependencies
-└── CLAUDE.md / AGENT.md          # This file + agent guidelines
+├── main.py                           # CLI entry (platform-routed via factory)
+├── GUI.py                            # Flask web UI (localhost:4000)
+├── requirements.txt
+└── CLAUDE.md
 ```
 
 ---
 
 ## Configuration
 
-**File:** `utils/.config.template.toml` (schema) → `config.toml` (user config)
+### Threads (full config)
 
-### Platform Selection
 ```toml
 [settings]
-platform = "reddit"     # or "threads"
-post_lang = "es-cr"     # Optional: translation language (all platforms)
-```
+platform = "threads"
 
-### Reddit Config
-```toml
-[reddit.creds]
-client_id = "..."       # OAuth app
-client_secret = "..."
-username = "..."
-password = "..."
-2fa = true/false
+[threads]
+discovery_method = "scrape"    # "api" (Graph API, own posts) or "scrape" (trending feed)
 
-[reddit.thread]
-subreddit = "AskReddit"
-post_id = ""            # Leave blank for auto-pick
-max_comment_length = 500
-min_comment_length = 1
-min_comments = 20
-blocked_words = "..."
-```
-
-### Threads Config (NEW)
-```toml
 [threads.creds]
-access_token = "EAABsbCS..."  # Meta Graph API token (60-day expiry)
-user_id = "12345678901234567"
-username = "your_insta"       # For Playwright login
+username = "your_insta"        # For Playwright login (always needed)
 password = "your_password"
+access_token = ""              # Only for discovery_method="api"
+user_id = ""                   # Only for discovery_method="api"
 
 [threads.thread]
-post_id = ""            # Leave blank for auto-pick
+post_id = ""                   # Specific post ID; blank = auto-pick from feed
 max_reply_length = 500
 min_reply_length = 1
-min_replies = 5
-blocked_words = "..."
-```
-
-### Generic Settings
-```toml
-[settings]
-theme = "dark"
-resolution_w = 1080
-resolution_h = 1920
-storymode = false
-times_to_run = 1
+min_replies = 5                # Minimum replies for post eligibility
+min_engagement = 0             # Minimum likes+reposts for viral filter (0=disabled, 10000=viral)
+blocked_words = ""
 
 [settings.tts]
-voice_choice = "tiktok"     # or "elevenlabs", "awspolly", "googletranslate", etc.
-random_voice = true
-silence_duration = 0.3
+voice_choice = "googletranslate"  # Best for macOS: no API key, fast, free
+# voice_choice = "tiktok"         # Needs tiktok_sessionid; auto-falls back to pyttsx3
+# voice_choice = "OpenAI"         # Needs openai_api_key
 
 [settings.background]
 background_video = "minecraft"
@@ -186,167 +145,117 @@ background_audio = "lofi"
 background_audio_volume = 0.15
 ```
 
+### Reddit (reference)
+
+```toml
+[settings]
+platform = "reddit"
+
+[reddit.creds]
+client_id = "..."
+client_secret = "..."
+username = "..."
+password = "..."
+2fa = false
+2fa_secret = ""               # TOTP base32 secret for auto-2FA
+
+[reddit.thread]
+subreddit = "AskReddit"
+min_comments = 20
+```
+
+### YouTube upload
+
+```toml
+[youtube]
+enabled = false                # Set true to auto-upload after render
+privacy = "public"             # or "private", "unlisted"
+client_secret_path = ""        # Path to youtube_client_secret.json
+```
+
+---
+
+## Platform-Specific Knowledge
+
+### Threads — Web Scraping (discovery_method = "scrape")
+
+**DOM Structure:**
+- Threads.net uses **div-based card layout** — NO `<article>` elements anywhere
+- Feed posts: `a[href*="/post/"]` links inside `<div>` cards (class contains `x1a2a7pz`)
+- Post pages: same structure; main post link appears first, replies follow
+- Screenshots: Use `a[href*="/post/"]` → ancestor div card, NOT `page.locator("article")`
+
+**Card Text Format (used by `_parse_card_text()`):**
+```
+Line 0:   username
+Line 1:   timestamp (e.g., "14h", "1d")
+Line 2..N: post body text
+Last 1-4: engagement metrics (likes, replies, reposts, quotes)
+```
+
+**Engagement Parsing:**
+- Numbers can be plain ("266") or abbreviated ("1K", "2.5M")
+- `likes` = first trailing number, `replies` = second, `reposts` = third
+- `min_engagement` filters by `likes + reposts` total
+- Posts are sorted by engagement descending before selection
+
+**Login Flow:**
+- Threads uses Instagram auth (`threads.net/login`)
+- Selectors: `input[autocomplete="username"]`, `input[autocomplete="current-password"]`
+- Button: `get_by_role("button", name="Log in", exact=True).first`
+- Cookies cached at `video_creation/data/cookie-threads.json`
+- Login logic is shared via `platforms/threads/auth.py`
+
+**API Limitation:**
+- Graph API v1.0 only accesses YOUR OWN posts — no trending/discovery
+- Scraping bypasses this entirely — no API token needed
+
+### Threads — Graph API (discovery_method = "api")
+
+- Auth: Bearer token, 60-day expiry
+- Only accesses authenticated user's own threads + replies
+- Use when you have your own content with replies
+
+### Reddit
+
+- **API:** PRAW (Python Reddit API Wrapper)
+- **Post discovery:** `subreddit.hot(limit=25)` → `get_subreddit_undone()` → fallback to `top(day/hour/month/week/year/all)`
+- **Screenshot:** Playwright on new.reddit.com
+- **2FA:** Auto-TOTP via `pyotp` when `2fa_secret` is configured in config.toml
+
 ---
 
 ## Development Guidelines
 
 ### ✅ DO:
 
-1. **Use platform factory in main.py**
-   ```python
-   from platforms import get_content_object, get_screenshot_fn
-   reddit_object = get_content_object(POST_ID)
-   screenshot_fn = get_screenshot_fn()
-   screenshot_fn(reddit_object, number_of_comments)
-   ```
-
-2. **Return standard content dict** from all fetchers
-   ```python
-   return {
-       "thread_id": ...,
-       "thread_category": ...,  # NEW: replaces hardcoded subreddit
-       "comments": [...]
-   }
-   ```
-
-3. **Use config fallback chains** for cross-platform keys
-   ```python
-   lang = (settings.config["settings"].get("post_lang") or
-           settings.config.get("reddit", {}).get("thread", {}).get("post_lang", ""))
-   ```
-
-4. **Read thread_category from dict** instead of config
-   ```python
-   # WRONG:
-   subreddit = settings.config["reddit"]["thread"]["subreddit"]
-
-   # RIGHT:
-   platform = settings.config["settings"].get("platform", "reddit")
-   if platform == "reddit":
-       subreddit = settings.config["reddit"]["thread"]["subreddit"]
-   else:
-       subreddit = reddit_obj.get("thread_category", platform)
-   ```
-
-5. **Test both platforms** after core pipeline changes
-   ```bash
-   # Test Reddit (must not regress)
-   sed -i 's/platform = "threads"/platform = "reddit"/' config.toml
-   python3 main.py
-
-   # Test Threads
-   sed -i 's/platform = "reddit"/platform = "threads"/' config.toml
-   python3 main.py --post-id <threads-id>
-   ```
+1. **Use platform factory** — never import platform modules directly
+2. **Return standard content_object** from all fetchers
+3. **Use clean body text** for TTS — parse out username/timestamp metadata
+4. **Default to `googletranslate` TTS on macOS** — pyttsx3 hangs in headless environments
+5. **Use `libx264` encoder on macOS** — `h264_nvenc` is NVIDIA-only
+6. **Test both Threads discovery methods:** `api` and `scrape`
 
 ### ❌ DON'T:
 
-1. **Don't import platform modules directly** in main.py/utils
-   ```python
-   # WRONG: from reddit.subreddit import get_subreddit_threads
-   # RIGHT: from platforms import get_content_object
-   ```
-
-2. **Don't hardcode platform names** in generic modules
-   ```python
-   # WRONG in final_video.py:
-   subreddit = settings.config["reddit"]["thread"]["subreddit"]
-
-   # RIGHT:
-   subreddit = reddit_obj.get("thread_category", "unknown")
-   ```
-
-3. **Don't add platform-specific UI selectors** outside `platforms/{platform}/screenshot.py`
-   - Reddit selectors stay in `video_creation/screenshot_downloader.py`
-   - Threads selectors stay in `platforms/threads/screenshot.py`
-
-4. **Don't assume config keys exist** without fallback
-   ```python
-   # WRONG: lang = settings.config["reddit"]["thread"]["post_lang"]
-   # RIGHT: lang = settings.config.get("settings", {}).get("post_lang", "")
-   ```
+1. **Don't use `<article>` selectors** on Threads.net — the DOM is div-based
+2. **Don't hardcode `h264_nvenc`** — use `libx264` for cross-platform compatibility
+3. **Don't rely on `drawtext` FFmpeg filter** — not available in Homebrew builds
+4. **Don't import platform modules directly** in main.py/utils
+5. **Don't assume config keys exist** without `.get()` fallback
 
 ---
 
-## Platform-Specific Knowledge
+## macOS-Specific Notes
 
-### Reddit
-- **API:** PRAW (Python Reddit API Wrapper)
-- **Auth:** OAuth app (client_id, secret) + username/password
-- **Screenshot:** Playwright on reddit.com/new.reddit.com
-  - Login form: `input[name="username"]`, `input[name="password"]`
-  - Post selector: `[data-test-id="post-content"]`
-  - Comment selector: `#t1_{comment_id}`
-- **NSFW:** `submission.over_18`
-- **Output folder:** `results/{subreddit}/`
-
-### Threads
-- **API:** Meta Graph API (v18.0+)
-- **Auth:** User access token (60-day lifetime) via https://developers.facebook.com/
-- **Screenshot:** Playwright on threads.net
-  - Login form: `input[autocomplete="username"]`, `input[autocomplete="current-password"]`
-  - Post selector: `article` (universal, more stable than Reddit)
-  - Cookies saved to: `video_creation/data/cookie-threads.json`
-- **NSFW:** API doesn't provide; always False
-- **Output folder:** `results/threads/`
-
-### Future: X/Twitter
-Create: `platforms/twitter/fetcher.py` + `platforms/twitter/screenshot.py` + config section
-Update: `platforms/__init__.py` with `elif platform == "twitter"` branches
-
----
-
-## Extending the Project
-
-### Adding a New TTS Provider
-1. Create `TTS/my_provider.py` with a class implementing the TTS interface
-2. Add config keys to `[settings.tts]` in `.config.template.toml`
-3. Update `TTS/engine_wrapper.py` to call your provider
-4. Test with `settings.config["settings"]["tts"]["voice_choice"] = "my_provider"`
-
-### Adding a New Platform (e.g., X/Twitter)
-1. **Create fetcher:** `platforms/twitter/fetcher.py`
-   - Implement `get_twitter_content(POST_ID=None)` returning standard dict
-2. **Create screenshotter:** `platforms/twitter/screenshot.py`
-   - Implement `get_screenshots_of_twitter_posts(content_object, screenshot_num)`
-3. **Update config:** Add `[twitter.creds]` and `[twitter.thread]` sections
-4. **Update factory:** Add `elif platform == "twitter"` in `platforms/__init__.py`
-5. **Update CLI helper:** Add case to `_get_platform_post_id()` in `main.py`
-6. **Test:** Verify Reddit mode still works, test Twitter mode end-to-end
-
-**Zero changes needed to:** TTS, backgrounds, video composition, or utils.
-
----
-
-## Debugging Tips
-
-### "No matching distribution found for yt-dlp==2026.3.17"
-→ yt-dlp uses date versioning (YYYY.M.DD, no leading zeros). Use `2025.10.14` (latest stable).
-
-### "Threads API: Invalid or expired access_token"
-→ Meta tokens expire every 60 days. Refresh at https://developers.facebook.com/tools/explorer/
-
-### Playwright timeout on Threads screenshot
-→ Login cookies corrupted or expired. Delete `video_creation/data/cookie-threads.json` to force fresh login next run.
-
-### "No eligible Threads posts found"
-→ Configure `[threads.thread].min_replies = 5` (or lower). Ensure your Threads account has public posts with replies.
-
-### Video dedup not working
-→ Check `video_creation/data/videos.json` is writable. Ensure `check_done_by_id()` is called before fetching content.
-
----
-
-## Testing Checklist
-
-- [ ] Reddit mode: `platform = "reddit"` produces video to `results/{subreddit}/`
-- [ ] Threads mode: `platform = "threads"` produces video to `results/threads/`
-- [ ] Video dedup: Running same post_id twice skips second run
-- [ ] Translation: `post_lang = "es"` translates filenames
-- [ ] TTS providers: Test with different voice_choice values
-- [ ] Background selection: Custom background video/audio works
-- [ ] Story mode: storymode=true only uses thread_post, not comments
-- [ ] Error handling: Invalid credentials show clear messages
+- **TTS:** `googletranslate` (gTTS) is the most reliable — free, fast, no API key
+  - `tiktok` auto-falls back to `pyttsx3` if sessionid missing, but pyttsx3 is very slow
+  - `pyttsx3` works but takes ~60s to initialize NSSpeechSynthesizer
+- **FFmpeg encoder:** MUST use `libx264` — `h264_nvenc` is NVIDIA GPU only
+- **FFmpeg filters:** `drawtext` missing from Homebrew bottle — credit text is disabled
+- **yt-dlp:** Keep updated (`pip install --upgrade yt-dlp`) — YouTube changes APIs frequently
+  - Format selector: `best[height<=1080]` not `bestvideo` (many videos lack video-only streams)
+  - Upgrade path: `pip install --upgrade yt-dlp`
 
 ---
 
@@ -354,16 +263,51 @@ Update: `platforms/__init__.py` with `elif platform == "twitter"` branches
 
 | File | Purpose |
 |------|---------|
-| `main.py` | CLI entry; orchestrates pipeline via factory |
-| `platforms/__init__.py` | Factory dispatch for multi-platform support |
-| `platforms/threads/fetcher.py` | Threads Graph API client |
-| `platforms/threads/screenshot.py` | Threads.net Playwright screenshotter |
-| `video_creation/final_video.py` | FFmpeg composition; platform-aware output naming |
-| `TTS/engine_wrapper.py` | TTS provider abstraction; post_lang fallback |
-| `utils/settings.py` | Config loading & validation |
+| `main.py` | CLI entry; pipeline orchestration via factory |
+| `platforms/__init__.py` | Factory dispatch (platform + discovery_method) |
+| `platforms/threads/scraper.py` | **NEW** — Web scraping fetcher with engagement parsing |
+| `platforms/threads/auth.py` | **NEW** — Shared Playwright login + cookie management |
+| `platforms/threads/fetcher.py` | Graph API client (own posts only) |
+| `platforms/threads/screenshot.py` | Div-based Threads screenshotter |
+| `video_creation/final_video.py` | FFmpeg composition (libx264, platform-aware output) |
+| `video_creation/background.py` | Background downloader (local files + yt-dlp) |
+| `video_creation/youtube_uploader.py` | **NEW** — OAuth2 YouTube upload |
+| `TTS/engine_wrapper.py` | TTS provider abstraction + TikTok fallback |
+| `TTS/TikTok.py` | Hardened TikTok TTS with graceful error handling |
+| `reddit/subreddit.py` | PRAW Reddit fetcher with auto-2FA |
+| `utils/settings.py` | Config loading + interactive validation |
 | `utils/videos.py` | Video dedup tracking |
 | `utils/.config.template.toml` | Config schema |
-| `requirements.txt` | Dependencies |
+| `utils/background_videos.json` | Background video manifest |
+| `utils/background_audios.json` | Background audio manifest |
+
+---
+
+## Debugging Tips
+
+### FFmpeg "Unknown encoder 'h264_nvenc'"
+→ On macOS, change to `libx264`. Find-and-replace `h264_nvenc` → `libx264` in `video_creation/final_video.py`.
+
+### FFmpeg "No such filter: 'drawtext'"
+→ Homebrew FFmpeg lacks drawtext. The credit text overlay is automatically skipped.
+
+### yt-dlp "Requested format is not available"
+→ Update yt-dlp: `pip install --upgrade yt-dlp`. Also change format selector from `bestvideo` to `best` in `video_creation/background.py`.
+
+### pyttsx3 hang on macOS
+→ NSSpeechSynthesizer needs GUI session. Switch to `voice_choice = "googletranslate"` for headless use.
+
+### Threads screenshots fail ("Main post article not found")
+→ Threads.net uses div cards, not `<article>`. Ensure screenshot code uses `a[href*="/post/"]` → ancestor div approach.
+
+### Config validator EOFError in non-interactive mode
+→ `check_toml()` prompts for ALL platform sections regardless of `platform` setting. Fill ALL required fields or load config directly with `toml.load()` + `settings.config = ...`.
+
+### Playwright timeout on Threads login
+→ Cookies corrupted. Delete `video_creation/data/cookie-threads.json` for fresh login. Also check button selector: must use `exact=True` due to multiple "Log in" buttons.
+
+### No viral posts found
+→ Lower `min_engagement` in config. Most Threads feed posts have <100 likes — 10000 filters almost everything.
 
 ---
 
@@ -376,74 +320,21 @@ pip install -r requirements.txt
 # Run CLI
 python3 main.py
 
-# Run with specific post
-python3 main.py <post_id>
+# Run bypassing config validator (non-interactive)
+python3 -c "
+import sys, toml
+sys.path.insert(0, '.')
+from utils import settings
+settings.config = toml.load('config.toml')
+from main import main; main()
+"
+
+# Update yt-dlp (YouTube downloads fix)
+pip install --upgrade yt-dlp
+
+# Check syntax
+python3 -m py_compile main.py platforms/threads/scraper.py
 
 # Run Flask GUI
 python3 GUI.py
-
-# Check syntax
-python3 -m py_compile main.py platforms/threads/fetcher.py
-
-# Format code
-black main.py platforms/ utils/
-
-# Lint
-pylint main.py
 ```
-
----
-
-## When You Get Stuck
-
-1. **"What does this module do?"** → Check imports in `main.py` or docstrings
-2. **"How do I add support for platform X?"** → See "Adding a New Platform" section above
-3. **"Why is my config not being read?"** → Check `utils/settings.py:check_toml()` and `.config.template.toml` schema
-4. **"Why isn't my TTS provider being called?"** → Check `TTS/engine_wrapper.py:make_voice()` and config `voice_choice`
-5. **"How do I debug the Playwright screenshot?"** → Uncomment `page.pause()` in screenshot downloader, run headful browser
-
-Good luck! 🚀
-
-<!-- gitnexus:start -->
-# GitNexus — Code Intelligence
-
-This project is indexed by GitNexus as **VideoMakerBot** (802 symbols, 1287 relationships, 32 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
-
-> If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
-
-## Always Do
-
-- **MUST run impact analysis before editing any symbol.** Before modifying a function, class, or method, run `gitnexus_impact({target: "symbolName", direction: "upstream"})` and report the blast radius (direct callers, affected processes, risk level) to the user.
-- **MUST run `gitnexus_detect_changes()` before committing** to verify your changes only affect expected symbols and execution flows.
-- **MUST warn the user** if impact analysis returns HIGH or CRITICAL risk before proceeding with edits.
-- When exploring unfamiliar code, use `gitnexus_query({query: "concept"})` to find execution flows instead of grepping. It returns process-grouped results ranked by relevance.
-- When you need full context on a specific symbol — callers, callees, which execution flows it participates in — use `gitnexus_context({name: "symbolName"})`.
-
-## Never Do
-
-- NEVER edit a function, class, or method without first running `gitnexus_impact` on it.
-- NEVER ignore HIGH or CRITICAL risk warnings from impact analysis.
-- NEVER rename symbols with find-and-replace — use `gitnexus_rename` which understands the call graph.
-- NEVER commit changes without running `gitnexus_detect_changes()` to check affected scope.
-
-## Resources
-
-| Resource | Use for |
-|----------|---------|
-| `gitnexus://repo/VideoMakerBot/context` | Codebase overview, check index freshness |
-| `gitnexus://repo/VideoMakerBot/clusters` | All functional areas |
-| `gitnexus://repo/VideoMakerBot/processes` | All execution flows |
-| `gitnexus://repo/VideoMakerBot/process/{name}` | Step-by-step execution trace |
-
-## CLI
-
-| Task | Read this skill file |
-|------|---------------------|
-| Understand architecture / "How does X work?" | `.claude/skills/gitnexus/gitnexus-exploring/SKILL.md` |
-| Blast radius / "What breaks if I change X?" | `.claude/skills/gitnexus/gitnexus-impact-analysis/SKILL.md` |
-| Trace bugs / "Why is X failing?" | `.claude/skills/gitnexus/gitnexus-debugging/SKILL.md` |
-| Rename / extract / split / refactor | `.claude/skills/gitnexus/gitnexus-refactoring/SKILL.md` |
-| Tools, resources, schema reference | `.claude/skills/gitnexus/gitnexus-guide/SKILL.md` |
-| Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus/gitnexus-cli/SKILL.md` |
-
-<!-- gitnexus:end -->

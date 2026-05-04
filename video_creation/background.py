@@ -86,7 +86,7 @@ def download_background_video(background_config: Tuple[str, str, str, Any]):
     print_substep("Downloading the backgrounds videos... please be patient 🙏 ")
     print_substep(f"Downloading {filename} from {uri}")
     ydl_opts = {
-        "format": "bestvideo[height<=1080][ext=mp4]",
+        "format": "best[height<=1080][ext=mp4]/best[height<=1080]",
         "outtmpl": f"assets/backgrounds/video/{credit}-{filename}",
         "retries": 10,
     }

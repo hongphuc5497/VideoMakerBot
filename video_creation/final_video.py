@@ -1,15 +1,17 @@
+import json
 import multiprocessing
 import os
 import re
+import subprocess
 import tempfile
 import textwrap
 import threading
 import time
-from os.path import exists  # Needs to be imported specifically
+from os.path import exists
 from pathlib import Path
 from typing import Dict, Final, Tuple
 
-import ffmpeg
+import av
 import translators
 from PIL import Image, ImageDraw, ImageFont
 from rich.console import Console
@@ -26,7 +28,27 @@ from utils.videos import save_data
 console = Console()
 
 
+def _probe_duration(path: str) -> float:
+    """Get media duration in seconds using PyAV."""
+    with av.open(path) as container:
+        stream = container.streams[0]
+        return float(stream.duration * stream.time_base)
+
+
+def _run_ffmpeg(args: list[str], description: str = "") -> None:
+    """Run ffmpeg subprocess with error handling."""
+    result = subprocess.run(
+        ["ffmpeg", "-y"] + args,
+        capture_output=True,
+    )
+    if result.returncode != 0:
+        stderr = result.stderr.decode("utf-8", errors="replace")
+        raise RuntimeError(f"ffmpeg {description} failed: {stderr[-500:]}")
+
+
 class ProgressFfmpeg(threading.Thread):
+    """Thread that reads ffmpeg progress via a named pipe during encoding."""
+
     def __init__(self, vid_duration_seconds, progress_update_callback):
         threading.Thread.__init__(self, name="ProgressFfmpeg")
         self.stop_event = threading.Event()
@@ -36,24 +58,24 @@ class ProgressFfmpeg(threading.Thread):
 
     def run(self):
         while not self.stop_event.is_set():
-            latest_progress = self.get_latest_ms_progress()
+            latest_progress = self._get_latest_ms_progress()
             if latest_progress is not None:
                 completed_percent = latest_progress / self.vid_duration_seconds
-                self.progress_update_callback(completed_percent)
+                self.progress_update_callback(min(completed_percent, 1.0))
             time.sleep(1)
 
-    def get_latest_ms_progress(self):
-        lines = self.output_file.readlines()
-
+    def _get_latest_ms_progress(self):
+        try:
+            with open(self.output_file.name) as f:
+                lines = f.readlines()
+        except (IOError, OSError):
+            return None
         if lines:
             for line in lines:
                 if "out_time_ms" in line:
-                    out_time_ms_str = line.split("=")[1].strip()
-                    if out_time_ms_str.isnumeric():
-                        return float(out_time_ms_str) / 1000000.0
-                    else:
-                        # Handle the case when "N/A" is encountered
-                        return None
+                    val = line.split("=")[1].strip()
+                    if val.isnumeric():
+                        return float(val) / 1000000.0
         return None
 
     def stop(self):
@@ -79,34 +101,22 @@ def name_normalize(name: str) -> str:
             settings.config.get("reddit", {}).get("thread", {}).get("post_lang", ""))
     if lang:
         print_substep("Translating filename...")
-        translated_name = translators.translate_text(name, translator="google", to_language=lang)
-        return translated_name
-    else:
-        return name
+        return translators.translate_text(name, translator="google", to_language=lang)
+    return name
 
 
 def prepare_background(reddit_id: str, W: int, H: int) -> str:
+    """Crop background video to match target aspect ratio, re-encode without audio."""
+    input_path = f"assets/temp/{reddit_id}/background.mp4"
     output_path = f"assets/temp/{reddit_id}/background_noaudio.mp4"
-    output = (
-        ffmpeg.input(f"assets/temp/{reddit_id}/background.mp4")
-        .filter("crop", f"ih*({W}/{H})", "ih")
-        .output(
-            output_path,
-            an=None,
-            **{
-                "c:v": "h264_nvenc",
-                "b:v": "20M",
-                "b:a": "192k",
-                "threads": multiprocessing.cpu_count(),
-            },
-        )
-        .overwrite_output()
-    )
-    try:
-        output.run(quiet=True)
-    except ffmpeg.Error as e:
-        print(e.stderr.decode("utf8"))
-        exit(1)
+    _run_ffmpeg([
+        "-i", input_path,
+        "-vf", f"crop=ih*({W}/{H}):ih,scale={W}:{H}",
+        "-c:v", "libx264", "-b:v", "20M",
+        "-an",
+        "-threads", str(multiprocessing.cpu_count()),
+        output_path,
+    ], "prepare_background")
     return output_path
 
 
@@ -120,51 +130,38 @@ def get_text_height(draw, text, font, max_width):
 
 
 def create_fancy_thumbnail(image, text, text_color, padding, wrap=35):
-    """
-    It will take the 1px from the middle of the template and will be resized (stretched) vertically to accommodate the extra height needed for the title.
-    """
     print_step(f"Creating fancy thumbnail for: {text}")
     font_title_size = 47
     font = ImageFont.truetype(os.path.join("fonts", "Roboto-Bold.ttf"), font_title_size)
     image_width, image_height = image.size
 
-    # Calculate text height to determine new image height
     draw = ImageDraw.Draw(image)
     text_height = get_text_height(draw, text, font, wrap)
     lines = textwrap.wrap(text, width=wrap)
-    # This is -50 to reduce the empty space at the bottom of the image,
-    # change it as per your requirement if needed otherwise leave it.
     new_image_height = image_height + text_height + padding * (len(lines) - 1) - 50
 
-    # Separate the image into top, middle (1px), and bottom parts
     top_part_height = image_height // 2
-    middle_part_height = 1  # 1px height middle section
+    middle_part_height = 1
     bottom_part_height = image_height - top_part_height - middle_part_height
 
     top_part = image.crop((0, 0, image_width, top_part_height))
     middle_part = image.crop((0, top_part_height, image_width, top_part_height + middle_part_height))
     bottom_part = image.crop((0, top_part_height + middle_part_height, image_width, image_height))
 
-    # Stretch the middle part
     new_middle_height = new_image_height - top_part_height - bottom_part_height
     middle_part = middle_part.resize((image_width, new_middle_height))
 
-    # Create new image with the calculated height
     new_image = Image.new("RGBA", (image_width, new_image_height))
-
-    # Paste the top, stretched middle, and bottom parts into the new image
     new_image.paste(top_part, (0, 0))
     new_image.paste(middle_part, (0, top_part_height))
     new_image.paste(bottom_part, (0, top_part_height + new_middle_height))
 
-    # Draw the title text on the new image
     draw = ImageDraw.Draw(new_image)
     y = top_part_height + padding
     for line in lines:
         draw.text((120, y), line, font=font, fill=text_color, align="left")
         y += get_text_height(draw, line, font, wrap) + padding
 
-    # Draw the username "PlotPulse" at the specific position
     username_font = ImageFont.truetype(os.path.join("fonts", "Roboto-Bold.ttf"), 30)
     draw.text(
         (205, 825),
@@ -173,28 +170,72 @@ def create_fancy_thumbnail(image, text, text_color, padding, wrap=35):
         fill=text_color,
         align="left",
     )
-
     return new_image
 
 
-def merge_background_audio(audio: ffmpeg, reddit_id: str):
-    """Gather an audio and merge with assets/backgrounds/background.mp3
-    Args:
-        audio (ffmpeg): The TTS final audio but without background.
-        reddit_id (str): The ID of subreddit
-    """
+def merge_background_audio(tts_audio_path: str, reddit_id: str) -> str:
+    """Mix background audio into the TTS audio. Returns path to the mixed file."""
     background_audio_volume = settings.config["settings"]["background"]["background_audio_volume"]
     if background_audio_volume == 0:
-        return audio  # Return the original audio
-    else:
-        # sets volume to config
-        bg_audio = ffmpeg.input(f"assets/temp/{reddit_id}/background.mp3").filter(
-            "volume",
-            background_audio_volume,
+        return tts_audio_path
+
+    output_path = f"assets/temp/{reddit_id}/audio_mixed.mp3"
+    bg_audio_path = f"assets/temp/{reddit_id}/background.mp3"
+    _run_ffmpeg([
+        "-i", tts_audio_path,
+        "-i", bg_audio_path,
+        "-filter_complex",
+        f"[1:a]volume={background_audio_volume}[bga];[0:a][bga]amix=inputs=2:duration=longest",
+        "-b:a", "192k",
+        output_path,
+    ], "audio_mix")
+    return output_path
+
+
+def _build_audio_concat_list(input_paths: list[str], list_path: str) -> None:
+    """Write a ffmpeg concat demuxer file list."""
+    with open(list_path, "w") as f:
+        for p in input_paths:
+            f.write(f"file '{os.path.abspath(p)}'\n")
+
+
+def _build_overlay_filter_complex(overlay_items: list[dict], W: int, H: int) -> str:
+    """Build a ffmpeg filter_complex string for overlaying images on background.
+
+    Each overlay item: {path, start_time, duration, opacity, scale_w, scale_h}
+    """
+    parts = []
+    prev_label = "0:v"  # background is the first input
+
+    for i, item in enumerate(overlay_items):
+        ov_label = f"ov{i}"
+        scaled_label = f"sc{i}"
+        faded_label = f"fd{i}"
+
+        # Scale the overlay image
+        parts.append(
+            f"[{i + 1}:v]scale={item['scale_w']}:{item['scale_h']}[{scaled_label}];"
         )
-        # Merges audio and background_audio
-        merged_audio = ffmpeg.filter([audio, bg_audio], "amix", duration="longest")
-        return merged_audio  # Return merged audio
+        # Set opacity
+        parts.append(
+            f"[{scaled_label}]colorchannelmixer=aa={item['opacity']}[{faded_label}];"
+        )
+        # Overlay with timing
+        enable = f"between(t,{item['start_time']},{item['start_time'] + item['duration']})"
+        next_label = f"out{i}" if i < len(overlay_items) - 1 else "outv"
+        parts.append(
+            f"[{prev_label}][{faded_label}]overlay="
+            f"x=(main_w-overlay_w)/2:y=(main_h-overlay_h)/2:"
+            f"enable='{enable}'[{next_label}]"
+        )
+        if i < len(overlay_items) - 1:
+            parts.append(";")
+        ov_label = ov_label  # unused, keeps naming consistent
+        prev_label = next_label
+
+    # Final scale
+    parts.append(f";[{prev_label}]scale={W}:{H}[final]")
+    return "".join(parts)
 
 
 def make_final_video(
@@ -203,19 +244,10 @@ def make_final_video(
     reddit_obj: dict,
     background_config: Dict[str, Tuple],
 ):
-    """Gathers audio clips, gathers all screenshots, stitches them together and saves the final video to assets/temp
-    Args:
-        number_of_clips (int): Index to end at when going through the screenshots'
-        length (int): Length of the video
-        reddit_obj (dict): The reddit object that contains the posts to read.
-        background_config (Tuple[str, str, str, Any]): The background config to use.
-    """
-    # settings values
+    """Gathers audio clips, stitches screenshots together, encodes final video."""
     W: Final[int] = int(settings.config["settings"]["resolution_w"])
     H: Final[int] = int(settings.config["settings"]["resolution_h"])
-
     opacity = settings.config["settings"]["opacity"]
-
     reddit_id = extract_id(reddit_obj)
 
     allowOnlyTTSFolder: bool = (
@@ -225,141 +257,125 @@ def make_final_video(
 
     print_step("Creating the final video 🎥")
 
-    background_clip = ffmpeg.input(prepare_background(reddit_id, W=W, H=H))
+    # --- Step 1: Prepare background ---
+    background_path = prepare_background(reddit_id, W=W, H=H)
 
-    # Gather all audio clips
-    audio_clips = list()
-    if number_of_clips == 0 and settings.config["settings"]["storymode"] == "false":
-        print(
-            "No audio clips to gather. Please use a different TTS or post."
-        )  # This is to fix the TypeError: unsupported operand type(s) for +: 'int' and 'NoneType'
+    # --- Step 2: Concatenate all TTS audio clips ---
+    audio_clip_paths = []
+    if number_of_clips == 0 and not settings.config["settings"]["storymode"]:
+        print("No audio clips to gather. Please use a different TTS or post.")
         exit()
+
     if settings.config["settings"]["storymode"]:
         if settings.config["settings"]["storymodemethod"] == 0:
-            audio_clips = [ffmpeg.input(f"assets/temp/{reddit_id}/mp3/title.mp3")]
-            audio_clips.insert(1, ffmpeg.input(f"assets/temp/{reddit_id}/mp3/postaudio.mp3"))
-        elif settings.config["settings"]["storymodemethod"] == 1:
-            audio_clips = [
-                ffmpeg.input(f"assets/temp/{reddit_id}/mp3/postaudio-{i}.mp3")
-                for i in track(range(number_of_clips + 1), "Collecting the audio files...")
+            audio_clip_paths = [
+                f"assets/temp/{reddit_id}/mp3/title.mp3",
+                f"assets/temp/{reddit_id}/mp3/postaudio.mp3",
             ]
-            audio_clips.insert(0, ffmpeg.input(f"assets/temp/{reddit_id}/mp3/title.mp3"))
-
+        else:
+            audio_clip_paths = [f"assets/temp/{reddit_id}/mp3/title.mp3"]
+            for i in range(number_of_clips + 1):
+                audio_clip_paths.append(f"assets/temp/{reddit_id}/mp3/postaudio-{i}.mp3")
     else:
-        audio_clips = [
-            ffmpeg.input(f"assets/temp/{reddit_id}/mp3/{i}.mp3") for i in range(number_of_clips)
-        ]
-        audio_clips.insert(0, ffmpeg.input(f"assets/temp/{reddit_id}/mp3/title.mp3"))
+        audio_clip_paths = [f"assets/temp/{reddit_id}/mp3/title.mp3"]
+        for i in range(number_of_clips):
+            audio_clip_paths.append(f"assets/temp/{reddit_id}/mp3/{i}.mp3")
 
-        audio_clips_durations = [
-            float(ffmpeg.probe(f"assets/temp/{reddit_id}/mp3/{i}.mp3")["format"]["duration"])
-            for i in range(number_of_clips)
-        ]
-        audio_clips_durations.insert(
-            0,
-            float(ffmpeg.probe(f"assets/temp/{reddit_id}/mp3/title.mp3")["format"]["duration"]),
-        )
-    audio_concat = ffmpeg.concat(*audio_clips, a=1, v=0)
-    ffmpeg.output(
-        audio_concat, f"assets/temp/{reddit_id}/audio.mp3", **{"b:a": "192k"}
-    ).overwrite_output().run(quiet=True)
+    existing = [p for p in audio_clip_paths if os.path.exists(p)]
+    concat_audio_path = f"assets/temp/{reddit_id}/audio.mp3"
+    concat_list_path = concat_audio_path + ".concat.txt"
+    _build_audio_concat_list(existing, concat_list_path)
+    _run_ffmpeg([
+        "-f", "concat", "-safe", "0", "-i", concat_list_path,
+        "-b:a", "192k", concat_audio_path,
+    ], "audio_concat")
+    os.unlink(concat_list_path)
+
+    # Probe durations
+    audio_clips_durations = [_probe_duration(p) for p in existing]
+
+    # --- Step 3: Mix background audio ---
+    mixed_audio_path = merge_background_audio(concat_audio_path, reddit_id)
 
     console.log(f"[bold green] Video Will Be: {length} Seconds Long")
 
+    # --- Step 4: Build overlay items ---
     screenshot_width = int((W * 45) // 100)
-    audio = ffmpeg.input(f"assets/temp/{reddit_id}/audio.mp3")
-    final_audio = merge_background_audio(audio, reddit_id)
-
-    image_clips = list()
-
     Path(f"assets/temp/{reddit_id}/png").mkdir(parents=True, exist_ok=True)
 
-    # Credits to tim (beingbored)
-    # get the title_template image and draw a text in the middle part of it with the title of the thread
     title_template = Image.open("assets/title_template.png")
-
     title = reddit_obj["thread_title"]
-
     title = name_normalize(title)
-
-    font_color = "#000000"
-    padding = 5
-
-    # create_fancy_thumbnail(image, text, text_color, padding
-    title_img = create_fancy_thumbnail(title_template, title, font_color, padding)
-
+    title_img = create_fancy_thumbnail(title_template, title, "#000000", 5)
     title_img.save(f"assets/temp/{reddit_id}/png/title.png")
-    image_clips.insert(
-        0,
-        ffmpeg.input(f"assets/temp/{reddit_id}/png/title.png")["v"].filter(
-            "scale", screenshot_width, -1
-        ),
-    )
 
-    current_time = 0
+    overlay_items = []
+    current_time = 0.0
+
+    overlay_items.append({
+        "path": f"assets/temp/{reddit_id}/png/title.png",
+        "start_time": current_time,
+        "duration": audio_clips_durations[0],
+        "opacity": opacity,
+        "scale_w": screenshot_width,
+        "scale_h": -1,
+    })
+    current_time += audio_clips_durations[0]
+
     if settings.config["settings"]["storymode"]:
-        audio_clips_durations = [
-            float(
-                ffmpeg.probe(f"assets/temp/{reddit_id}/mp3/postaudio-{i}.mp3")["format"]["duration"]
-            )
-            for i in range(number_of_clips)
-        ]
-        audio_clips_durations.insert(
-            0,
-            float(ffmpeg.probe(f"assets/temp/{reddit_id}/mp3/title.mp3")["format"]["duration"]),
-        )
         if settings.config["settings"]["storymodemethod"] == 0:
-            image_clips.insert(
-                1,
-                ffmpeg.input(f"assets/temp/{reddit_id}/png/story_content.png").filter(
-                    "scale", screenshot_width, -1
-                ),
-            )
-            background_clip = background_clip.overlay(
-                image_clips[0],
-                enable=f"between(t,{current_time},{current_time + audio_clips_durations[0]})",
-                x="(main_w-overlay_w)/2",
-                y="(main_h-overlay_h)/2",
-            )
-            current_time += audio_clips_durations[0]
+            story_path = f"assets/temp/{reddit_id}/png/story_content.png"
+            if os.path.exists(story_path):
+                overlay_items.append({
+                    "path": story_path,
+                    "start_time": current_time,
+                    "duration": audio_clips_durations[1] if len(audio_clips_durations) > 1 else 5,
+                    "opacity": opacity,
+                    "scale_w": screenshot_width,
+                    "scale_h": -1,
+                })
         elif settings.config["settings"]["storymodemethod"] == 1:
-            for i in track(range(0, number_of_clips + 1), "Collecting the image files..."):
-                image_clips.append(
-                    ffmpeg.input(f"assets/temp/{reddit_id}/png/img{i}.png")["v"].filter(
-                        "scale", screenshot_width, -1
-                    )
-                )
-                background_clip = background_clip.overlay(
-                    image_clips[i],
-                    enable=f"between(t,{current_time},{current_time + audio_clips_durations[i]})",
-                    x="(main_w-overlay_w)/2",
-                    y="(main_h-overlay_h)/2",
-                )
-                current_time += audio_clips_durations[i]
+            for i in range(number_of_clips + 1):
+                img_path = f"assets/temp/{reddit_id}/png/img{i}.png"
+                if not os.path.exists(img_path):
+                    continue
+                dur_idx = i + 1
+                if dur_idx >= len(audio_clips_durations):
+                    break
+                overlay_items.append({
+                    "path": img_path,
+                    "start_time": current_time,
+                    "duration": audio_clips_durations[dur_idx],
+                    "opacity": opacity,
+                    "scale_w": screenshot_width,
+                    "scale_h": -1,
+                })
+                current_time += audio_clips_durations[dur_idx]
     else:
-        for i in range(0, number_of_clips + 1):
-            image_clips.append(
-                ffmpeg.input(f"assets/temp/{reddit_id}/png/comment_{i}.png")["v"].filter(
-                    "scale", screenshot_width, -1
-                )
-            )
-            image_overlay = image_clips[i].filter("colorchannelmixer", aa=opacity)
-            assert (
-                audio_clips_durations is not None
-            ), "Please make a GitHub issue if you see this. Ping @JasonLovesDoggo on GitHub."
-            background_clip = background_clip.overlay(
-                image_overlay,
-                enable=f"between(t,{current_time},{current_time + audio_clips_durations[i]})",
-                x="(main_w-overlay_w)/2",
-                y="(main_h-overlay_h)/2",
-            )
+        for i in range(number_of_clips + 1):
+            img_path = f"assets/temp/{reddit_id}/png/comment_{i}.png"
+            if not os.path.exists(img_path):
+                continue
+            if i >= len(audio_clips_durations):
+                break
+            overlay_items.append({
+                "path": img_path,
+                "start_time": current_time,
+                "duration": audio_clips_durations[i],
+                "opacity": opacity,
+                "scale_w": screenshot_width,
+                "scale_h": -1,
+            })
             current_time += audio_clips_durations[i]
 
-    title = extract_id(reddit_obj, "thread_title")
+    # --- Step 5: Build filter_complex and render ---
+    filter_complex = _build_overlay_filter_complex(overlay_items, W, H)
+
+    title_clean = extract_id(reddit_obj, "thread_title")
     idx = extract_id(reddit_obj)
     title_thumb = reddit_obj["thread_title"]
+    filename = f"{name_normalize(title_clean)[:251]}"
 
-    filename = f"{name_normalize(title)[:251]}"
     platform = settings.config["settings"].get("platform", "reddit")
     if platform == "reddit":
         subreddit = settings.config["reddit"]["thread"]["subreddit"]
@@ -371,58 +387,36 @@ def make_final_video(
         os.makedirs(f"./results/{subreddit}")
 
     if not exists(f"./results/{subreddit}/OnlyTTS") and allowOnlyTTSFolder:
-        print_substep("The 'OnlyTTS' folder could not be found so it was automatically created.")
         os.makedirs(f"./results/{subreddit}/OnlyTTS")
 
-    # create a thumbnail for the video
+    # Thumbnail
     settingsbackground = settings.config["settings"]["background"]
-
     if settingsbackground["background_thumbnail"]:
         if not exists(f"./results/{subreddit}/thumbnails"):
-            print_substep(
-                "The 'results/thumbnails' folder could not be found so it was automatically created."
-            )
             os.makedirs(f"./results/{subreddit}/thumbnails")
-        # get the first file with the .png extension from assets/backgrounds and use it as a background for the thumbnail
         first_image = next(
-            (file for file in os.listdir("assets/backgrounds") if file.endswith(".png")),
+            (f for f in os.listdir("assets/backgrounds") if f.endswith(".png")),
             None,
         )
-        if first_image is None:
-            print_substep("No png files found in assets/backgrounds", "red")
-
-        else:
+        if first_image:
             font_family = settingsbackground["background_thumbnail_font_family"]
             font_size = settingsbackground["background_thumbnail_font_size"]
             font_color = settingsbackground["background_thumbnail_font_color"]
             thumbnail = Image.open(f"assets/backgrounds/{first_image}")
             width, height = thumbnail.size
             thumbnailSave = create_thumbnail(
-                thumbnail,
-                font_family,
-                font_size,
-                font_color,
-                width,
-                height,
-                title_thumb,
+                thumbnail, font_family, font_size, font_color, width, height, title_thumb,
             )
             thumbnailSave.save(f"./assets/temp/{reddit_id}/thumbnail.png")
             print_substep(f"Thumbnail - Building Thumbnail in assets/temp/{reddit_id}/thumbnail.png")
 
-    text = f"Background by {background_config['video'][2]}"
-    background_clip = ffmpeg.drawtext(
-        background_clip,
-        text=text,
-        x=f"(w-text_w)",
-        y=f"(h-text_h)",
-        fontsize=5,
-        fontcolor="White",
-        fontfile=os.path.join("fonts", "Roboto-Regular.ttf"),
-    )
-    background_clip = background_clip.filter("scale", W, H)
+    # --- Step 6: Render ---
+    defaultPath = f"results/{subreddit}"
+    video_output_path = defaultPath + f"/{filename}"
+    video_output_path = video_output_path[:251] + ".mp4"
+
     print_step("Rendering the video 🎥")
     from tqdm import tqdm
-
     pbar = tqdm(total=100, desc="Progress: ", bar_format="{l_bar}{bar}", unit=" %")
 
     def on_update_example(progress) -> None:
@@ -430,68 +424,70 @@ def make_final_video(
         old_percentage = pbar.n
         pbar.update(status - old_percentage)
 
-    defaultPath = f"results/{subreddit}"
+    # Build ffmpeg command: background + overlay images → filter_complex → video only
+    ffmpeg_inputs = ["-i", background_path]
+    for item in overlay_items:
+        ffmpeg_inputs.extend(["-i", item["path"]])
+
     with ProgressFfmpeg(length, on_update_example) as progress:
-        path = defaultPath + f"/{filename}"
-        path = (
-            path[:251] + ".mp4"
-        )  # Prevent a error by limiting the path length, do not change this.
-        try:
-            ffmpeg.output(
-                background_clip,
-                final_audio,
-                path,
-                f="mp4",
-                **{
-                    "c:v": "h264_nvenc",
-                    "b:v": "20M",
-                    "b:a": "192k",
-                    "threads": multiprocessing.cpu_count(),
-                },
-            ).overwrite_output().global_args("-progress", progress.output_file.name).run(
-                quiet=True,
-                overwrite_output=True,
-                capture_stdout=False,
-                capture_stderr=False,
-            )
-        except ffmpeg.Error as e:
-            print(e.stderr.decode("utf8"))
-            exit(1)
+        # First pass: render video with overlays (no audio)
+        video_only_path = video_output_path + ".video.mp4"
+        _run_ffmpeg(
+            ffmpeg_inputs + [
+                "-filter_complex", filter_complex,
+                "-map", "[final]",
+                "-c:v", "libx264", "-b:v", "20M",
+                "-pix_fmt", "yuv420p",
+                "-threads", str(multiprocessing.cpu_count()),
+                "-progress", progress.output_file.name,
+                video_only_path,
+            ],
+            "overlay_render"
+        )
+
+    # Second pass: mux video with audio
+    _run_ffmpeg([
+        "-i", video_only_path,
+        "-i", mixed_audio_path,
+        "-c:v", "copy", "-c:a", "aac", "-b:a", "192k",
+        "-shortest", "-map", "0:v:0", "-map", "1:a:0",
+        video_output_path,
+    ], "audio_mux")
+    os.unlink(video_only_path)
+
     old_percentage = pbar.n
     pbar.update(100 - old_percentage)
-    if allowOnlyTTSFolder:
-        path = defaultPath + f"/OnlyTTS/{filename}"
-        path = (
-            path[:251] + ".mp4"
-        )  # Prevent a error by limiting the path length, do not change this.
-        print_step("Rendering the Only TTS Video 🎥")
-        with ProgressFfmpeg(length, on_update_example) as progress:
-            try:
-                ffmpeg.output(
-                    background_clip,
-                    audio,
-                    path,
-                    f="mp4",
-                    **{
-                        "c:v": "h264_nvenc",
-                        "b:v": "20M",
-                        "b:a": "192k",
-                        "threads": multiprocessing.cpu_count(),
-                    },
-                ).overwrite_output().global_args("-progress", progress.output_file.name).run(
-                    quiet=True,
-                    overwrite_output=True,
-                    capture_stdout=False,
-                    capture_stderr=False,
-                )
-            except ffmpeg.Error as e:
-                print(e.stderr.decode("utf8"))
-                exit(1)
 
-        old_percentage = pbar.n
-        pbar.update(100 - old_percentage)
+    # OnlyTTS variant
+    if allowOnlyTTSFolder:
+        only_tts_path = defaultPath + f"/OnlyTTS/{filename}"
+        only_tts_path = only_tts_path[:251] + ".mp4"
+        only_tts_video = only_tts_path + ".video.mp4"
+        print_step("Rendering the Only TTS Video 🎥")
+        with ProgressFfmpeg(length, on_update_example) as progress2:
+            _run_ffmpeg(
+                ffmpeg_inputs + [
+                    "-filter_complex", filter_complex,
+                    "-map", "[final]",
+                    "-c:v", "libx264", "-b:v", "20M",
+                    "-pix_fmt", "yuv420p",
+                    "-threads", str(multiprocessing.cpu_count()),
+                    "-progress", progress2.output_file.name,
+                    only_tts_video,
+                ],
+                "only_tts_render"
+            )
+        _run_ffmpeg([
+            "-i", only_tts_video,
+            "-i", concat_audio_path,
+            "-c:v", "copy", "-c:a", "aac", "-b:a", "192k",
+            "-shortest", "-map", "0:v:0", "-map", "1:a:0",
+            only_tts_path,
+        ], "only_tts_mux")
+        os.unlink(only_tts_video)
+
     pbar.close()
-    save_data(subreddit, filename + ".mp4", title, idx, background_config["video"][2])
+    save_data(subreddit, filename + ".mp4", title_clean, idx, background_config["video"][2])
     print_step("Removing temporary files 🗑")
     cleanups = cleanup(reddit_id)
     print_substep(f"Removed {cleanups} temporary files 🗑")
