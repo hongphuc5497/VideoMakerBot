@@ -251,3 +251,22 @@ config.toml
 
 .omx
 .gitnexus
+
+# Claude Code / Ruflo / AgentDB local state
+.claude-flow/
+.claude/agents/
+.claude/commands/
+.claude/helpers/
+.claude/settings.json
+.claude/skills/
+.claude/memory.db
+.swarm/
+.understand-anything/
+.mcp.json
+.playwright-mcp/
+.code-review/
+agentdb.rvf
+agentdb.rvf.lock
+claude-flow.config.json
+ruvector.db
+pipeline-ui-*.png
