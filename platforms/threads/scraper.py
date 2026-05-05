@@ -12,7 +12,7 @@ from playwright.sync_api import BrowserContext, Locator, sync_playwright
 
 from platforms.threads.auth import ensure_authenticated_context
 from utils import settings
-from utils.console import print_step, print_substep
+from utils.console import emit_scraper_event, print_step, print_substep
 from utils.voice import sanitize_text
 from utils.videos import check_done_by_id
 
@@ -124,6 +124,7 @@ def _extract_text_from_card(link: Locator) -> str:
 def _scrape_feed_posts(context: BrowserContext, max_scrolls: int = MAX_FEED_SCROLLS) -> list[dict]:
     """Navigate to threads.net feed, scroll, extract post metadata with engagement metrics."""
     print_step("Scraping Threads trending feed...")
+    emit_scraper_event("browser_launch", {"message": "Scraping Threads trending feed"})
     page = context.new_page()
     posts: list[dict] = []
     seen_ids: set[str] = set()
@@ -163,6 +164,15 @@ def _scrape_feed_posts(context: BrowserContext, max_scrolls: int = MAX_FEED_SCRO
                 })
                 new_found += 1
 
+                emit_scraper_event("post_discovered", {
+                    "username": parsed["username"],
+                    "body": parsed["body"][:100],
+                    "likes": parsed["likes"],
+                    "replies": parsed["replies"],
+                    "reposts": parsed["reposts"],
+                    "post_id": post_id,
+                })
+
             if new_found > 0:
                 top = posts[-1]
                 print_substep(
@@ -171,6 +181,13 @@ def _scrape_feed_posts(context: BrowserContext, max_scrolls: int = MAX_FEED_SCRO
                     f"'{top['body'][:50]}...'",
                     style="dim",
                 )
+
+            emit_scraper_event("feed_scroll", {
+                "scroll": i + 1,
+                "new_posts": new_found,
+                "total_posts": len(posts),
+                "max_scrolls": max_scrolls,
+            })
 
             if new_found == 0 and i > 5:
                 break
@@ -196,6 +213,7 @@ def _scrape_search_page(context: BrowserContext, query: str, max_scrolls: int = 
     Uses the same card extraction as the main feed.
     """
     print_step(f"Scraping Threads search: '{query}'...")
+    emit_scraper_event("search_query", {"query": query, "posts_found": 0})
     page = context.new_page()
     posts: list[dict] = []
     seen_ids: set[str] = set()
@@ -244,6 +262,7 @@ def _scrape_search_page(context: BrowserContext, query: str, max_scrolls: int = 
         page.close()
 
     print_substep(f"Search '{query}': {len(posts)} posts.", style="dim")
+    emit_scraper_event("search_query", {"query": query, "posts_found": len(posts)})
     return posts
 
 
@@ -330,6 +349,13 @@ def _filter_candidates(posts: list[dict]) -> list[dict]:
 
     # Sort by engagement descending — most viral first
     candidates.sort(key=lambda p: p.get("_total_engagement", 0), reverse=True)
+
+    emit_scraper_event("filter_results", {
+        "before": len(posts),
+        "after": len(candidates),
+        "min_engagement": min_engagement,
+        "max_age_hours": max_age_hours,
+    })
 
     age_str = f", max age ≤{max_age_hours}h" if max_age_hours else ""
     if min_engagement > 0:
@@ -555,8 +581,21 @@ def get_trending_threads_content(POST_ID: Optional[str] = None) -> dict:
                     f"'{candidate['body'][:60]}...'",
                     style="dim",
                 )
+                emit_scraper_event("visiting_post", {
+                    "post_id": candidate["post_id"],
+                    "url": candidate["url"],
+                    "engagement": eng,
+                    "likes": candidate.get("likes", 0),
+                    "body": candidate.get("body", "")[:60],
+                    "attempt": i + 1,
+                })
                 try:
                     replies = _scrape_post_replies(context, candidate["url"])
+                    emit_scraper_event("replies_found", {
+                        "post_id": candidate["post_id"],
+                        "count": len(replies),
+                        "min_required": min_replies,
+                    })
                     if len(replies) >= min_replies:
                         if not candidate.get("body") or len(candidate.get("body", "")) < 50:
                             full_text = _scrape_main_post_text(context, candidate["url"])
@@ -569,6 +608,13 @@ def get_trending_threads_content(POST_ID: Optional[str] = None) -> dict:
                             f"♥{candidate['likes']:,} 💬{len(content['comments'])} replies",
                             style="bold green",
                         )
+                        emit_scraper_event("post_selected", {
+                            "title": content["thread_title"][:80],
+                            "post_id": candidate["post_id"],
+                            "likes": candidate["likes"],
+                            "replies_count": len(content["comments"]),
+                            "url": candidate["url"],
+                        })
                         return content
                     print_substep(
                         f"  Only {len(replies)} replies (need {min_replies}). Trying next...",

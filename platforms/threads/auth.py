@@ -9,7 +9,7 @@ from pathlib import Path
 from playwright.sync_api import Browser, BrowserContext, Page, ViewportSize
 
 from utils import settings
-from utils.console import print_substep
+from utils.console import emit_scraper_event, print_substep
 
 THREADS_LOGIN_URL = "https://www.threads.net/login"
 THREADS_COOKIE_FILE = "./video_creation/data/cookie-threads.json"
@@ -32,6 +32,7 @@ def login_to_threads(page: Page, _context: BrowserContext) -> None:
         )
 
     print_substep("Logging into Threads (via Instagram)...")
+    emit_scraper_event("login", {"message": "Logging into Threads (via Instagram)..."})
     page.goto(THREADS_LOGIN_URL, timeout=0)
     page.wait_for_load_state("networkidle")
 
@@ -47,6 +48,7 @@ def login_to_threads(page: Page, _context: BrowserContext) -> None:
         json.dump(cookies, f)
 
     print_substep("Logged into Threads and saved session cookies.", style="bold green")
+    emit_scraper_event("login", {"message": "Logged in successfully"})
 
 
 def ensure_authenticated_context(browser: Browser, **kwargs) -> BrowserContext:
@@ -81,6 +83,7 @@ def ensure_authenticated_context(browser: Browser, **kwargs) -> BrowserContext:
                 saved_cookies = json.load(f)
             context.add_cookies(saved_cookies)
             print_substep("Loaded saved Threads session cookies.")
+            emit_scraper_event("login", {"message": "Loaded saved session cookies"})
         except (json.JSONDecodeError, IOError):
             print_substep("Saved cookies corrupted. Logging in fresh...")
             page = context.new_page()

@@ -19,6 +19,20 @@ def set_progress_callback(cb):
     _progress_callback = cb
 
 
+def emit_scraper_event(event_type: str, data: dict = None):
+    """Emit a structured scraper event for GUI visualization.
+
+    Called by platform scrapers to stream real-time scraping activity
+    to the web UI. If no progress callback is set, this is a no-op.
+
+    Event types: browser_launch, login, feed_scroll, post_discovered,
+                 search_query, filter_results, visiting_post,
+                 replies_found, post_selected, general
+    """
+    if _progress_callback:
+        _progress_callback(event=event_type, data=data or {})
+
+
 def print_markdown(text) -> None:
     """Prints a rich info message. Support Markdown syntax."""
 

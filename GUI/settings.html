@@ -127,6 +127,11 @@
                                             <label class="label"><span class="label-text text-slate-400">Min Comments: <span class="val-display font-mono text-indigo-400"></span></span></label>
                                             <input name="reddit.thread.min_comments" type="range" min="1" max="100" step="1" class="range range-xs range-indigo" value="{{ data['reddit.thread.min_comments'] }}">
                                         </div>
+                                        <div class="form-control w-full">
+                                            <label class="label"><span class="label-text text-slate-400">Blocked Words</span></label>
+                                            <input name="reddit.thread.blocked_words" value="{{ data['reddit.thread.blocked_words'] }}" type="text" class="input input-bordered bg-slate-900 border-slate-700" placeholder="nsfw, spoiler, politics">
+                                            <label class="label"><span class="label-text-alt text-slate-500">Comma-separated. Posts and comments matching these words are skipped.</span></label>
+                                        </div>
                                     </div>
 
                                     <!-- Threads Options -->
@@ -142,6 +147,11 @@
                                         <div class="form-control w-full">
                                             <label class="label"><span class="label-text text-slate-400">Min Replies: <span class="val-display font-mono text-indigo-400"></span></span></label>
                                             <input name="threads.thread.min_replies" type="range" min="1" max="50" step="1" class="range range-xs range-indigo" value="{{ data['threads.thread.min_replies'] }}">
+                                        </div>
+                                        <div class="form-control w-full">
+                                            <label class="label"><span class="label-text text-slate-400">Blocked Words</span></label>
+                                            <input name="threads.thread.blocked_words" value="{{ data['threads.thread.blocked_words'] }}" type="text" class="input input-bordered bg-slate-900 border-slate-700" placeholder="nsfw, spoiler, politics">
+                                            <label class="label"><span class="label-text-alt text-slate-500">Comma-separated. Posts and replies matching these words are skipped.</span></label>
                                         </div>
                                     </div>
                                 </div>

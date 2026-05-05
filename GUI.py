@@ -3,6 +3,7 @@ import json
 import os
 import sys
 import threading
+import time
 import webbrowser
 from pathlib import Path
 
@@ -173,10 +174,30 @@ pipeline_state: dict = {
     "error": None,
     "result": None,  # {"title": ..., "file": ..., "url": ...}
     "log": [],       # Last N status messages
+    "scraper_events": [],  # Structured scraper events for visualization
 }
 
 
-def _run_pipeline():
+def _event_to_summary(event_type, data):
+    """Convert a structured scraper event to a human-readable log line."""
+    data = data or {}
+    summaries = {
+        "browser_launch": lambda d: "Launching browser...",
+        "login": lambda d: d.get("message", "Login event"),
+        "feed_scroll": lambda d: f"Scrolled: {d.get('new_posts', 0)} new, {d.get('total_posts', 0)} total",
+        "post_discovered": lambda d: f"Post by {d.get('username', '?')}: {d.get('body', '')[:45]}",
+        "search_query": lambda d: f"Search '{d.get('query', '?')}': {d.get('posts_found', 0)} posts",
+        "filter_results": lambda d: f"Filtered {d.get('before', 0)} -> {d.get('after', 0)} candidates",
+        "visiting_post": lambda d: f"Trying post {d.get('post_id', '')[:8]}...",
+        "replies_found": lambda d: f"Got {d.get('count', 0)} replies (need {d.get('min_required', '?')})",
+        "post_selected": lambda d: f"Selected: {d.get('title', '')[:55]}",
+        "general": lambda d: d.get("message", ""),
+    }
+    fn = summaries.get(event_type)
+    return fn(data) if fn else None
+
+
+def _run_pipeline(search_queries=None):
     """Run the video creation pipeline in a background thread."""
     import toml
     from utils import console as uconsole
@@ -188,18 +209,34 @@ def _run_pipeline():
         pipeline_state["error"] = None
         pipeline_state["result"] = None
         pipeline_state["log"] = []
+        pipeline_state["scraper_events"] = []
 
     try:
         # Load config
         settings.config = toml.load("config.toml")
 
-        # Set up progress callback
-        def on_progress(stage=""):
+        # Apply search_queries override if provided from UI
+        if search_queries:
+            settings.config.setdefault("threads", {}).setdefault("thread", {})["search_queries"] = search_queries
+
+        # Set up progress callback with structured event support
+        def on_progress(stage=None, event=None, data=None):
             with pipeline_lock:
-                pipeline_state["stage"] = stage
-                pipeline_state["log"].append(stage)
-                if len(pipeline_state["log"]) > 20:
-                    pipeline_state["log"] = pipeline_state["log"][-20:]
+                if stage:
+                    pipeline_state["stage"] = stage
+                    pipeline_state["log"].append(stage)
+                    if len(pipeline_state["log"]) > 20:
+                        pipeline_state["log"] = pipeline_state["log"][-20:]
+                if event:
+                    entry = {"type": event, "data": data or {}, "ts": time.time()}
+                    pipeline_state["scraper_events"].append(entry)
+                    if len(pipeline_state["scraper_events"]) > 100:
+                        pipeline_state["scraper_events"] = pipeline_state["scraper_events"][-100:]
+                    summary = _event_to_summary(event, data)
+                    if summary:
+                        pipeline_state["log"].append(summary)
+                        if len(pipeline_state["log"]) > 20:
+                            pipeline_state["log"] = pipeline_state["log"][-20:]
 
         uconsole.set_progress_callback(on_progress)
 
@@ -225,10 +262,19 @@ def create():
     if request.method == "POST":
         if pipeline_state["running"]:
             return jsonify({"status": "already_running"})
-        thread = threading.Thread(target=_run_pipeline, daemon=True)
+        data = request.get_json(silent=True) or {}
+        search_queries = data.get("search_queries") or None
+        thread = threading.Thread(
+            target=_run_pipeline,
+            kwargs={"search_queries": search_queries},
+            daemon=True,
+        )
         thread.start()
         return jsonify({"status": "started"})
-    return render_template("create.html", state=pipeline_state)
+    # Load current config default for pre-filling the keywords input
+    cfg = tomlkit.loads(Path("config.toml").read_text())
+    default_queries = cfg.get("threads", {}).get("thread", {}).get("search_queries", "")
+    return render_template("create.html", state=pipeline_state, default_search_queries=default_queries)
 
 
 @app.route("/create/status")
