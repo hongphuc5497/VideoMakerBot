@@ -14,11 +14,9 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt ./
-# Pin pip for reproducible builds: --upgrade pip==25.x
 RUN pip install --upgrade pip \
     && pip install -r requirements.txt \
-    && pip install pytest \
-    && pip cache purge
+    && pip install pytest
 
 RUN python -m playwright install --with-deps chromium
 
