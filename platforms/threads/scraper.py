@@ -559,8 +559,8 @@ def get_trending_threads_content(POST_ID: Optional[str] = None) -> dict:
                         for sp in search_posts:
                             if sp["post_id"] not in existing_ids:
                                 posts.append(sp)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        print_substep(f"Search query failed: {e}", "yellow")
 
             if not posts:
                 raise RuntimeError("No posts found in feed. Try again later.")

@@ -1,4 +1,5 @@
 import re
+import sys
 
 import praw
 from praw.models import MoreComments
@@ -105,11 +106,20 @@ def get_subreddit_threads(POST_ID: str):
         submission = get_subreddit_undone(threads, subreddit)
 
     if submission is None:
-        return get_subreddit_threads(POST_ID)  # submission already done. rerun
+        # submission already done — retry with depth limit to prevent infinite recursion
+        if not hasattr(get_subreddit_threads, "_retry_depth"):
+            get_subreddit_threads._retry_depth = 0
+        get_subreddit_threads._retry_depth += 1
+        if get_subreddit_threads._retry_depth > 50:
+            raise RuntimeError("Exceeded retry limit (50) looking for an undone submission")
+        try:
+            return get_subreddit_threads(POST_ID)
+        finally:
+            get_subreddit_threads._retry_depth -= 1
 
     elif not submission.num_comments and settings.config["settings"]["storymode"] == "false":
         print_substep("No comments found. Skipping.")
-        exit()
+        sys.exit()
 
     submission = check_done(submission)  # double-checking
 

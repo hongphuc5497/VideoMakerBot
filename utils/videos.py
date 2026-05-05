@@ -60,6 +60,7 @@ def save_data(subreddit: str, filename: str, reddit_title: str, reddit_id: str, 
         done_vids.append(payload)
         raw_vids.seek(0)
         json.dump(done_vids, raw_vids, ensure_ascii=False, indent=4)
+        raw_vids.truncate()
 
 
 def check_done_by_id(post_id: str) -> bool:

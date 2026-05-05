@@ -1,5 +1,7 @@
 import os
 import re
+import subprocess
+import sys
 import time
 from typing import List
 
@@ -30,7 +32,10 @@ def posttextparser(obj, *, tried: bool = False) -> List[str]:
         nlp = spacy.load("en_core_web_sm")
     except OSError as e:
         if not tried:
-            os.system("python -m spacy download en_core_web_sm")
+            subprocess.run(
+                [sys.executable, "-m", "spacy", "download", "en_core_web_sm"],
+                check=False,
+            )
             time.sleep(5)
             return posttextparser(obj, tried=True)
         print_step(
