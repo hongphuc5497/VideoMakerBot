@@ -5,7 +5,7 @@
 **VideoMakerBot** — Automated short-form video creator from social media content.
 
 **Status:** Production-ready, actively maintained (v3.4.0)
-**Language:** Python 3.10 (locked by `Dockerfile`; host venv may use 3.14 for tooling only)
+**Language:** Python 3.14+ (host); Docker image uses python:3.10-slim-bookworm for stability
 **Runtime:** **Docker only** — all CLI, GUI, and test invocations go through `docker compose`. Do not invoke `python` on the host.
 **Platforms:** Reddit (PRAW API), Threads (Graph API + Web Scraping)
 
@@ -36,7 +36,7 @@ main.py (CLI)
             │   or platforms/threads/screenshot.py (Threads)
             ├─→ video_creation/background.py [local or yt-dlp]
             ├─→ video_creation/youtube_uploader.py [optional auto-upload]
-            └─→ video_creation/final_video.py [FFmpeg with libx264]
+            └─→ video_creation/final_video.py [FFmpeg with libx264; exports get_output_path()]
                 ↓
                 results/{category}/{video.mp4}
 ```
@@ -218,6 +218,7 @@ Last 1-4: engagement metrics (likes, replies, reposts, quotes)
 - Threads uses Instagram auth (`threads.net/login`)
 - Selectors: `input[autocomplete="username"]`, `input[autocomplete="current-password"]`
 - Button: `get_by_role("button", name="Log in", exact=True).first`
+- After click: `page.wait_for_url("https://www.threads.net/", timeout=15000)` — event-wait, not fixed delay
 - Cookies cached at `video_creation/data/cookie-threads.json`
 - Login logic is shared via `platforms/threads/auth.py`
 
@@ -265,6 +266,21 @@ Last 1-4: engagement metrics (likes, replies, reposts, quotes)
 6. **Don't reintroduce jQuery, Bootstrap, or ClipboardJS** — the UI is vanilla ES6 + Tailwind + DaisyUI + Lucide
 7. **Don't write to `utils/backgrounds.json`** — it is a legacy empty file. Use `utils/background_videos.json` and `utils/background_audios.json`
 
+### 🔒 Security (hardened May 2026)
+
+1. **No `eval()`** — use `{"int": int, "float": float, "bool": bool, "str": str}` dict dispatch for type coercion. `utils/settings.py` has module-level `_TYPE_COERCION`.
+2. **No `os.system()`** — use `subprocess.run([...])` with argument lists. No shell interpretation of paths.
+3. **No `shell=True`** — removed from all `subprocess.run()` and `Popen()` calls.
+4. **No bare `except:`** — always catch specific exception types. Bare excepts swallow `KeyboardInterrupt` and `SystemExit`.
+5. **Redact secrets before printing** — `main.py` error handler deep-copies config and masks all credential fields before logging.
+6. **Settings page secrets** — `GUI.py` redacts API keys/passwords from the data dict passed to `settings.html`. Sensitive fields show as `********`.
+7. **CSRF protection** — `GUI.py` has `@app.before_request` that checks `Origin` header on all mutating requests.
+8. **Security headers** — `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` on every response.
+9. **Flask secret key** — loaded from `FLASK_SECRET_KEY` env var, falls back to `os.urandom(32)` per startup.
+10. **Docker non-root** — container runs as `appuser`, not root.
+11. **Path traversal** — `/video/<id>` uses `Path.resolve().relative_to()` guard; `add_background()` sanitizes citation with `re.sub(r"[./\\\\]", "_", citation)`.
+12. **No hardcoded credentials** in source — all secrets loaded from `config.toml` (gitignored). Rotate passwords regularly.
+
 ---
 
 ## Web UI (Flask, served by `gui` service)
@@ -291,20 +307,20 @@ Last 1-4: engagement metrics (likes, replies, reposts, quotes)
 | `platforms/threads/auth.py` | **NEW** — Shared Playwright login + cookie management |
 | `platforms/threads/fetcher.py` | Graph API client (own posts only) |
 | `platforms/threads/screenshot.py` | Div-based Threads screenshotter |
-| `video_creation/final_video.py` | FFmpeg composition (libx264, platform-aware output) |
-| `video_creation/background.py` | Background downloader (local files + yt-dlp) |
-| `video_creation/youtube_uploader.py` | **NEW** — OAuth2 YouTube upload |
-| `TTS/engine_wrapper.py` | TTS provider abstraction + TikTok fallback |
+| `video_creation/final_video.py` | FFmpeg composition (libx264, platform-aware output); exports `get_output_path()` for shared path computation |
+| `video_creation/background.py` | Background downloader (local files + yt-dlp); prefers already-downloaded videos |
+| `video_creation/youtube_uploader.py` | OAuth2 YouTube upload |
+| `TTS/engine_wrapper.py` | TTS provider abstraction + TikTok→pyttsx3 fallback; single-pass ffmpeg concat |
 | `TTS/TikTok.py` | Hardened TikTok TTS with graceful error handling |
-| `reddit/subreddit.py` | PRAW Reddit fetcher with auto-2FA |
-| `utils/settings.py` | Config loading + interactive validation |
-| `utils/videos.py` | Video dedup tracking |
+| `reddit/subreddit.py` | PRAW Reddit fetcher with auto-2FA; retry-depth limit (50) on submission search |
+| `utils/settings.py` | Config loading + interactive validation; uses `_TYPE_COERCION` dict (no eval) |
+| `utils/videos.py` | Video dedup tracking (`check_done`, `check_done_by_id`, `save_data` with truncate) |
 | `utils/.config.template.toml` | Config schema (also drives Settings page validation) |
 | `utils/background_videos.json` | Background video manifest (served at `/backgrounds.json`) |
 | `utils/background_audios.json` | Background audio manifest |
-| `utils/gui_utils.py` | `add_background`, `delete_background`, `modify_settings`, `get_checks` |
-| `GUI.py` | Flask app: `/`, `/video/<id>`, `/backgrounds`, `/settings`, `/create` |
-| `Dockerfile` | python:3.10-slim-bookworm + ffmpeg + Playwright Chromium + pytest |
+| `utils/gui_utils.py` | `add_background`, `delete_background`, `modify_settings`, `get_checks` (no eval) |
+| `GUI.py` | Flask app: `/`, `/video/<id>`, `/backgrounds`, `/settings`, `/create`; CSRF + security headers |
+| `Dockerfile` | python:3.10-slim-bookworm + ffmpeg + Playwright Chromium + pytest; runs as `appuser` |
 | `docker-compose.yml` | Three services: `gui` (port 4000), `cli`, `test` |
 | `tests/test_gui_utils.py` | Pytest regression for Background Manager round-trip |
 
@@ -342,6 +358,24 @@ Last 1-4: engagement metrics (likes, replies, reposts, quotes)
 ### Stale image after editing `requirements.txt` or `Dockerfile`
 → `docker compose build` to rebuild. Code changes alone do NOT need a rebuild because the repo root is bind-mounted to `/app`.
 
+### Python bytecode caching in long-running GUI container
+→ The GUI process caches imported modules in `sys.modules`. After editing pipeline code (`final_video.py`, `background.py`, `screenshot.py`), restart the GUI (`docker compose restart gui`) or trigger a pipeline run which now calls `importlib.reload()` on all pipeline modules automatically.
+
+### Reddit image template appearing in Threads videos
+→ Verify `platform` in config.toml is `"threads"` (not `"reddit"`). The `if platform == "reddit"` guard in `final_video.py` blocks the Reddit template. If it still appears, restart the GUI container to flush Python bytecode cache.
+
+### Background video download fails (yt-dlp HTTP 403)
+→ `get_background_config()` now prefers already-downloaded videos. Set `background_video` in config.toml to a downloaded video name (check `assets/backgrounds/video/`). If empty, it randomly picks from downloaded videos first.
+
+### TTS output has wrong number of audio clips
+→ `engine_wrapper.run()` returns `idx + 1` (count, not last index). If you're getting one fewer clip than expected, check the return value consumers — they should treat it as a count.
+
+### videos.json corruption (trailing garbage after save)
+→ Fixed: `save_data()` now calls `raw_vids.truncate()` after `json.dump()`. If you have an existing corrupted file, delete `video_creation/data/videos.json` and it will be recreated.
+
+### Infinite recursion in Reddit post discovery
+→ Fixed: `get_subreddit_threads()` has a retry-depth limit of 50. If you hit this, your subreddit may have no undone posts — try a different subreddit or clear `videos.json`.
+
 ---
 
 ## Useful Commands (Docker-only)
@@ -375,3 +409,39 @@ docker compose exec gui ls /app/results/threads/
 ```
 
 > Anything that needs `pip install`, `playwright install`, or `apt-get` belongs in `Dockerfile` followed by `docker compose build` — never run those on the host.
+
+---
+
+## Recent Changes (May 2026 Security Hardening)
+
+**eval() removal:** All `eval(checks["type"])(value)` patterns replaced with `{"int": int, "float": float, "bool": bool, "str": str}` dict dispatch in `utils/settings.py`, `utils/console.py`, `utils/gui_utils.py`.
+
+**os.system() removal:** `TTS/engine_wrapper.py:split_post` now uses `subprocess.run([...])` with argument lists. `utils/posttextparser.py` spacy download uses `subprocess.run([sys.executable, "-m", "spacy", ...])`.
+
+**shell=True removal:** All `subprocess.run(..., shell=True)` and `Popen(..., shell=True)` replaced with argument lists in `main.py` and `utils/ffmpeg_install.py`.
+
+**Credential leak prevention:** `main.py` error handler deep-copies config and redacts all secrets before printing. `GUI.py` masks sensitive keys as `********` in settings page data.
+
+**CSRF + security headers:** `GUI.py` checks `Origin` header on POST/PUT/DELETE. `X-Content-Type-Options`, `X-Frame-Options` headers added.
+
+**Docker hardening:** Container runs as `appuser` (non-root). Digest pinning + pip version comments added for production.
+
+**Bug fixes (18 total):**
+- Config overwrite crash (config=None after empty file write)
+- Playwright TimeoutError (wrong exception class caught)
+- Lambda closure (loop variable captured by reference)
+- Redundant ffmpeg runs (concat now single-pass)
+- Audio IndexError on empty TTS output
+- Hardcoded NSFW post selector (now generic role-based)
+- JSON truncation bug in save_data (missing truncate())
+- Infinite recursion in Reddit post discovery (retry limit 50)
+- Silent exception swallowing in scraper search
+- exit() → sys.exit() in subreddit.py
+- Dead macOS branch (os.name == "mac" → sys.platform == "darwin")
+- Wrong upstream repo in version check (now configurable + resilient)
+- Duplicate path logic (get_output_path() shared between main.py and final_video.py)
+- Catastrophic backtracking URL regex (now atomic https?://\S+)
+- Fixed 6s login delay (now wait_for_url event-wait)
+- 6 bare except: clauses → specific exception types
+- Temp file leak in ProgressFfmpeg (cleanup in __exit__)
+- Flask secret key hardcoded → env var + urandom fallback
