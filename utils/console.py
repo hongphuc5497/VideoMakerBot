@@ -9,6 +9,15 @@ from rich.text import Text
 
 console = Console()
 
+# Progress callback for GUI integration.
+# Set by GUI.py to receive stage-change notifications during pipeline runs.
+_progress_callback = None
+
+
+def set_progress_callback(cb):
+    global _progress_callback
+    _progress_callback = cb
+
 
 def print_markdown(text) -> None:
     """Prints a rich info message. Support Markdown syntax."""
@@ -22,6 +31,8 @@ def print_step(text) -> None:
 
     panel = Panel(Text(text, justify="left"))
     console.print(panel)
+    if _progress_callback:
+        _progress_callback(stage=text)
 
 
 def print_table(items) -> None:

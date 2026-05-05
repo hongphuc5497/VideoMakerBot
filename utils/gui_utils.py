@@ -7,32 +7,37 @@ import tomlkit
 from flask import flash
 
 
-# Get validation checks from template
+# Get validation checks from template, keyed by dotted path
+# (e.g. "reddit.creds.username", "threads.creds.username") so that
+# leaf-key collisions across platform sections don't clobber each other.
 def get_checks():
     template = toml.load("utils/.config.template.toml")
     checks = {}
 
-    def unpack_checks(obj: dict):
+    def unpack_checks(obj: dict, path):
         for key in obj.keys():
-            if "optional" in obj[key].keys():
-                checks[key] = obj[key]
-            else:
-                unpack_checks(obj[key])
+            full = f"{path}.{key}" if path else key
+            if isinstance(obj[key], dict) and "optional" in obj[key].keys():
+                checks[full] = obj[key]
+            elif isinstance(obj[key], dict):
+                unpack_checks(obj[key], full)
 
-    unpack_checks(template)
+    unpack_checks(template, "")
 
     return checks
 
 
-# Get current config (from config.toml) as dict
-def get_config(obj: dict, done=None):
+# Get current config (from config.toml) as a dict keyed by dotted path.
+# Mirrors the path layout of get_checks() so the GUI can match values to checks.
+def get_config(obj: dict, done=None, path=""):
     if done is None:
         done = {}
     for key in obj.keys():
+        full = f"{path}.{key}" if path else key
         if not isinstance(obj[key], dict):
-            done[key] = obj[key]
+            done[full] = obj[key]
         else:
-            get_config(obj[key], done)
+            get_config(obj[key], done, full)
 
     return done
 
@@ -92,29 +97,30 @@ def check(value, checks):
 
 # Modify settings (after the form is submitted)
 def modify_settings(data: dict, config_load, checks: dict):
-    # Modify config settings
-    def modify_config(obj: dict, config_name: str, value: any):
-        for key in obj.keys():
-            if config_name == key:
-                obj[key] = value
-            elif not isinstance(obj[key], dict):
-                continue
-            else:
-                modify_config(obj[key], config_name, value)
+    # Walk the dotted path and set the value at the precise location.
+    # Example: "reddit.creds.username" -> config_load["reddit"]["creds"]["username"]
+    def set_by_path(obj: dict, dotted_path: str, value):
+        parts = dotted_path.split(".")
+        cursor = obj
+        for part in parts[:-1]:
+            if part not in cursor or not isinstance(cursor[part], dict):
+                cursor[part] = {}
+            cursor = cursor[part]
+        cursor[parts[-1]] = value
 
-    # Remove empty/incorrect key-value pairs
-    data = {key: value for key, value in data.items() if value and key in checks.keys()}
+    # Filter data to only include keys present in checks
+    data = {key: value for key, value in data.items() if key in checks.keys()}
 
-    # Validate values
-    for name in data.keys():
-        value = check(data[name], checks[name])
+    # Validate and apply values
+    for name, raw_value in data.items():
+        value = check(raw_value, checks[name])
 
         # Value is invalid
         if value == "Error":
             flash("Some values were incorrect and didn't save!", "error")
         else:
             # Value is valid
-            modify_config(config_load, name, value)
+            set_by_path(config_load, name, value)
 
     # Save changes in config.toml
     with Path("config.toml").open("w") as toml_file:
@@ -127,21 +133,22 @@ def modify_settings(data: dict, config_load, checks: dict):
 
 # Delete background video
 def delete_background(key):
-    # Read backgrounds.json
-    with open("utils/backgrounds.json", "r", encoding="utf-8") as backgrounds:
+    # Read background catalog
+    with open("utils/background_videos.json", "r", encoding="utf-8") as backgrounds:
         data = json.load(backgrounds)
 
-    # Remove background from backgrounds.json
-    with open("utils/backgrounds.json", "w", encoding="utf-8") as backgrounds:
-        if data.pop(key, None):
-            json.dump(data, backgrounds, ensure_ascii=False, indent=4)
-        else:
-            flash("Couldn't find this background. Try refreshing the page.", "error")
-            return
+    if data.pop(key, None) is None:
+        flash("Couldn't find this background. Try refreshing the page.", "error")
+        return
+
+    with open("utils/background_videos.json", "w", encoding="utf-8") as backgrounds:
+        json.dump(data, backgrounds, ensure_ascii=False, indent=4)
 
     # Remove background video from ".config.template.toml"
     config = tomlkit.loads(Path("utils/.config.template.toml").read_text())
-    config["settings"]["background"]["background_choice"]["options"].remove(key)
+    options = config["settings"]["background"]["background_video"]["options"]
+    if key in options:
+        options.remove(key)
 
     with Path("utils/.config.template.toml").open("w") as toml_file:
         toml_file.write(tomlkit.dumps(config))
@@ -181,7 +188,7 @@ def add_background(youtube_uri, filename, citation, position):
     filename = filename.replace(" ", "_")
 
     # Check if the background doesn't already exist
-    with open("utils/backgrounds.json", "r", encoding="utf-8") as backgrounds:
+    with open("utils/background_videos.json", "r", encoding="utf-8") as backgrounds:
         data = json.load(backgrounds)
 
         # Check if key isn't already taken
@@ -190,21 +197,24 @@ def add_background(youtube_uri, filename, citation, position):
             return
 
         # Check if the YouTube URI isn't already used under different name
-        if youtube_uri in [data[i][0] for i in list(data.keys())]:
+        if youtube_uri in [data[i][0] for i in list(data.keys()) if i != "__comment"]:
             flash("Background video with this YouTube URI is already added!", "error")
             return
 
     # Add background video to json file
-    with open("utils/backgrounds.json", "r+", encoding="utf-8") as backgrounds:
+    with open("utils/background_videos.json", "r+", encoding="utf-8") as backgrounds:
         data = json.load(backgrounds)
 
         data[filename] = [youtube_uri, filename + ".mp4", citation, position]
         backgrounds.seek(0)
+        backgrounds.truncate()
         json.dump(data, backgrounds, ensure_ascii=False, indent=4)
 
     # Add background video to ".config.template.toml"
     config = tomlkit.loads(Path("utils/.config.template.toml").read_text())
-    config["settings"]["background"]["background_choice"]["options"].append(filename)
+    options = config["settings"]["background"]["background_video"]["options"]
+    if filename not in options:
+        options.append(filename)
 
     with Path("utils/.config.template.toml").open("w") as toml_file:
         toml_file.write(tomlkit.dumps(config))
@@ -212,3 +222,36 @@ def add_background(youtube_uri, filename, citation, position):
     flash(f'Added "{citation}-{filename}.mp4" as a new background video!')
 
     return
+
+
+# Delete videos by ID list — removes entries from videos.json and mp4 files from disk.
+# Returns the number of files actually removed from disk.
+def delete_videos(ids):
+    ids = set(ids)
+    videos_path = Path("video_creation/data/videos.json")
+    results_root = Path("results").resolve()
+
+    with videos_path.open("r", encoding="utf-8") as f:
+        videos = json.load(f)
+
+    to_delete = {v["id"]: v for v in videos if v.get("id") in ids}
+    remaining = [v for v in videos if v.get("id") not in ids]
+
+    deleted = 0
+    for entry in to_delete.values():
+        subreddit = entry.get("subreddit", "")
+        filename = entry.get("filename", "")
+        if subreddit and filename:
+            try:
+                file_path = (results_root / subreddit / filename).resolve()
+                file_path.relative_to(results_root)  # path-traversal guard
+                if file_path.exists():
+                    file_path.unlink()
+                    deleted += 1
+            except (ValueError, OSError):
+                pass
+
+    with videos_path.open("w", encoding="utf-8") as f:
+        json.dump(remaining, f, ensure_ascii=False, indent=4)
+
+    return deleted

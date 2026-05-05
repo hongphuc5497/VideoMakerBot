@@ -32,9 +32,10 @@ The only original thing being done is the editing and gathering of all materials
 
 ## Requirements
 
-- Python 3.10
+- Python 3.10+
 - Playwright (this should install automatically in installation)
 - Docker and Docker Compose for the container workflow
+- FFmpeg (for video composition)
 
 ## Installation 👩‍💻
 
@@ -136,21 +137,38 @@ For a more detailed guide about the bot, please refer to the [documentation](htt
 
 https://user-images.githubusercontent.com/66544866/173453972-6526e4e6-c6ef-41c5-ab40-5d275e724e7c.mp4
 
+## Web User Interface 🖥️
+
+VideoMakerBot features a modernized Flask-based web UI for easier management and generation.
+
+- **Technology Stack**: Tailwind CSS, DaisyUI, Lucide Icons, Vanilla ES6 JavaScript.
+- **Video Library**: View, download, and copy source links for generated videos.
+- **Background Manager**: Add and remove background videos (YouTube-linked) and manage audio tracks.
+- **Settings**: Complete configuration of platform credentials (Reddit, Threads), TTS providers, and visual preferences.
+
+To start the UI locally without Docker:
+```sh
+python GUI.py
+```
+Visit `http://localhost:4000` to access the dashboard.
+
 ## Contributing & Ways to improve 📈
 
 In its current state, this bot does exactly what it needs to do. However, improvements can always be made!
 
 I have tried to simplify the code so anyone can read it and start contributing at any skill level. Don't be shy :) contribute!
 
-- [ ] Creating better documentation and adding a command line interface.
+- [x] Creating better documentation and adding a command line interface.
 - [x] Allowing the user to choose background music for their videos.
-- [x] Allowing users to choose a reddit thread instead of being randomized.
+- [x] Allowing users to choose a reddit/threads thread instead of being randomized.
 - [x] Allowing users to choose a background that is picked instead of the Minecraft one.
 - [x] Allowing users to choose between any subreddit.
 - [x] Allowing users to change voice.
-- [x] Checks if a video has already been created
-- [x] Light and Dark modes
-- [x] NSFW post filter
+- [x] Checks if a video has already been created.
+- [x] Light and Dark modes.
+- [x] NSFW post filter.
+- [x] Threads platform support.
+- [x] Modern Web UI (Tailwind + DaisyUI).
 
 Please read our [contributing guidelines](CONTRIBUTING.md) for more detailed information.
 

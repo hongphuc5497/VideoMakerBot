@@ -16,7 +16,7 @@ RUN apt-get update \
 COPY requirements.txt ./
 RUN pip install --upgrade pip \
     && pip install -r requirements.txt \
-    && python -m spacy download en_core_web_sm
+    && pip install pytest
 
 RUN python -m playwright install --with-deps chromium
 

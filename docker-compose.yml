@@ -25,3 +25,15 @@ services:
     volumes:
       - ./:/app
     shm_size: "1gb"
+
+  test:
+    build:
+      context: .
+    image: videomakerbot:latest
+    command: ["pytest", "tests/", "-v"]
+    environment:
+      PYTHONUNBUFFERED: "1"
+      PYTHONPATH: "/app"
+    volumes:
+      - ./:/app
+    shm_size: "1gb"

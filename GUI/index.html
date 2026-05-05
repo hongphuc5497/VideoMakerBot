@@ -1,23 +1,96 @@
 {% extends "layout.html" %}
 {% block main %}
 
-<main>
-    <div class="album py-2 bg-light">
-        <div class="container">
+<div class="bg-slate-900 min-h-screen py-8">
+    <div class="container mx-auto px-4">
+        <!-- Header & Search -->
+        <div class="flex flex-col md:flex-row justify-between items-center gap-4 mb-8">
+            <h1 class="text-2xl font-bold text-white">Video Library</h1>
 
-            <div class="row mt-2">
-                <div class="col-12 col-md-3 mb-3">
-                    <input type="text" class="form-control searchFilter" placeholder="Search videos"
-                        aria-label="Search videos" onkeyup="searchFilter()">
+            <!-- Bulk-action bar (visible in select mode only) -->
+            <div id="bulk-bar" class="hidden items-center gap-2">
+                <button type="button" onclick="selectAll()"
+                        class="btn btn-ghost text-slate-400 border border-slate-700">
+                    <i data-lucide="check-square" class="w-4 h-4 mr-1"></i>
+                    <span id="select-all-label">Select All</span>
+                </button>
+                <button type="button" onclick="cancelSelectMode()"
+                        class="btn btn-ghost text-slate-400">
+                    Cancel
+                </button>
+                <button id="bulk-delete-btn" type="button" onclick="confirmBulkDelete()"
+                        class="btn btn-error" disabled>
+                    <i data-lucide="trash-2" class="w-4 h-4 mr-1"></i>
+                    Delete (<span id="selection-count">0</span>)
+                </button>
+            </div>
+
+            <!-- Normal toolbar (hidden in select mode) -->
+            <div id="normal-toolbar" class="flex items-center gap-2 w-full md:w-auto">
+                <button type="button" onclick="toggleSelectMode()"
+                        class="btn btn-ghost text-slate-400 border border-slate-700 shrink-0"
+                        style="height: 3rem; min-height: 3rem;">
+                    <i data-lucide="check-square" class="w-4 h-4 mr-1"></i>
+                    Select
+                </button>
+                <div class="relative w-full md:w-72">
+                    <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
+                    <input type="text"
+                           class="searchFilter input input-bordered w-full pl-10 bg-slate-800 border-slate-700 text-slate-200 focus:border-indigo-500"
+                           style="height: 3rem;"
+                           placeholder="Search videos..."
+                           onkeyup="searchFilter()">
                 </div>
             </div>
+        </div>
 
-            <div class="grid row row-cols-1 row-cols-sm-2 row-cols-md-3 g-3" id="videos">
+        <!-- Video Grid -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6" id="videos">
+            <!-- Videos will be injected here -->
+        </div>
 
-            </div>
+        <!-- Empty State -->
+        <div id="empty-state" class="hidden flex flex-col items-center justify-center py-20 text-slate-500">
+            <i data-lucide="video-off" class="w-16 h-16 mb-4 opacity-20"></i>
+            <p class="text-lg">No videos found</p>
         </div>
     </div>
-</main>
+</div>
+
+<!-- Video Player Modal -->
+<dialog id="player_modal" class="modal modal-bottom sm:modal-middle">
+    <div class="modal-box bg-slate-900 border border-white/10 max-w-2xl p-0 overflow-hidden">
+        <div class="flex justify-between items-center px-4 py-3 border-b border-white/5">
+            <h3 id="player_title" class="font-medium text-slate-200 truncate pr-4"></h3>
+            <button type="button" onclick="closePlayer()" class="btn btn-square btn-sm btn-ghost text-slate-400">
+                <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+        </div>
+        <video id="player_video" class="w-full bg-black" controls playsinline></video>
+    </div>
+    <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+
+<!-- Delete Confirmation Modal -->
+<dialog id="delete_modal" class="modal">
+    <div class="modal-box bg-slate-900 border border-white/10">
+        <div class="flex items-center gap-3 mb-3">
+            <i data-lucide="triangle-alert" class="w-5 h-5 text-red-400 shrink-0"></i>
+            <h3 class="font-bold text-lg text-white">Delete Video?</h3>
+        </div>
+        <p id="delete-modal-msg" class="text-slate-400 mb-6 text-sm"></p>
+        <div class="modal-action mt-0">
+            <form method="dialog">
+                <button class="btn btn-ghost text-slate-400">Cancel</button>
+            </form>
+            <button type="button" class="btn btn-error" onclick="executeDelete()">
+                <i data-lucide="trash-2" class="w-4 h-4 mr-1"></i>
+                Delete
+            </button>
+        </div>
+    </div>
+    <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
 
 <script>
     const intervals = [
@@ -31,152 +104,287 @@
 
     function timeSince(date) {
         const seconds = Math.floor((Date.now() / 1000 - date));
-        const interval = intervals.find(i => i.seconds < seconds);
+        const interval = intervals.find(i => i.seconds <= seconds) || intervals[intervals.length - 1];
         const count = Math.floor(seconds / interval.seconds);
         return `${count} ${interval.label}${count !== 1 ? 's' : ''} ago`;
     }
 
-    $(document).ready(function () {
-        $.getJSON("videos.json",
-            function (data) {
-                data.sort((b, a) => a['time'] - b['time'])
-                var video = '';
-                $.each(data, function (key, value) {
-                    video += '<div class="col">';
-                    video += '<div class="card shadow-sm">';
-                    //keeping original themed image card for future thumbnail usage video += '<svg class="bd-placeholder-img card-img-top" width="100%" height="225" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Placeholder: Thumbnail" preserveAspectRatio="xMidYMid slice" focusable="false"><title>Placeholder</title><rect width="100%" height="100%" fill="#55595c"/><text x="50%" y="50%" fill="#eceeef" dy=".3em">r/'+value.subreddit+'</text></svg>';
-
-                    video += '<div class="card-body">';
-                    video += '<p class="card-text">r/' + value.subreddit + ' • ' + checkTitle(value.reddit_title, value.filename) + '</p>';
-                    video += '<div class="d-flex justify-content-between align-items-center">';
-                    video += '<div class="btn-group">';
-                    video += '<a href="https://www.reddit.com/r/' + value.subreddit + '/comments/' + value.id + '/" class="btn btn-sm btn-outline-secondary" target="_blank">View</a>';
-                    video += '<a href="http://localhost:4000/results/' + value.subreddit + '/' + value.filename + '" class="btn btn-sm btn-outline-secondary" download>Download</a>';
-                    video += '</div>';
-                    video += '<div class="btn-group">';
-                    video += '<button type="button" data-toggle="tooltip" id="copy" data-original-title="Copy to clipboard" class="btn btn-sm btn-outline-secondary" data-clipboard-text="' + getCopyData(value.subreddit, value.reddit_title, value.filename, value.background_credit) + '"><i class="bi bi-card-text"></i></button>';
-                    video += '<button type="button" data-toggle="tooltip" id="copy" data-original-title="Copy to clipboard" class="btn btn-sm btn-outline-secondary" data-clipboard-text="' + checkTitle(value.reddit_title, value.filename) + ' #Shorts #reddit"><i class="bi bi-youtube"></i></button>';
-                    video += '<button type="button" data-toggle="tooltip" id="copy" data-original-title="Copy to clipboard" class="btn btn-sm btn-outline-secondary" data-clipboard-text="' + checkTitle(value.reddit_title, value.filename) + ' #reddit"><i class="bi bi-instagram"></i></button>';
-                    video += '</div>';
-                    video += '<small class="text-muted">' + timeSince(value.time) + '</small>';
-                    video += '</div>';
-                    video += '</div>';
-                    video += '</div>';
-                    video += '</div>';
-
-                });
-
-                $('#videos').append(video);
-            });
-    });
-
-    $(document).ready(function () {
-        $('[data-toggle="tooltip"]').tooltip();
-        $('[data-toggle="tooltip"]').on('click', function () {
-            $(this).tooltip('hide');
-        });
-    });
-
-    $('#copy').tooltip({
-        trigger: 'click',
-        placement: 'bottom'
-    });
-
-    function setTooltip(btn, message) {
-        $(btn).tooltip('hide')
-            .attr('data-original-title', message)
-            .tooltip('show');
+    function categoryLabel(subreddit) {
+        if (!subreddit) return "";
+        if (subreddit === "threads") return "Threads";
+        return `r/${subreddit}`;
     }
 
-    function hoverTooltip(btn, message) {
-        $(btn).tooltip('hide')
-            .attr('data-original-title', message)
-            .tooltip('show');
-    }
-
-    function hideTooltip(btn) {
-        setTimeout(function () {
-            $(btn).tooltip('hide');
-        }, 1000);
-    }
-
-    function disposeTooltip(btn) {
-        setTimeout(function () {
-            $(btn).tooltip('dispose');
-        }, 1500);
-    }
-
-    var clipboard = new ClipboardJS('#copy');
-
-    clipboard.on('success', function (e) {
-        e.clearSelection();
-        console.info('Action:', e.action);
-        console.info('Text:', e.text);
-        console.info('Trigger:', e.trigger);
-        setTooltip(e.trigger, 'Copied!');
-        hideTooltip(e.trigger);
-        disposeTooltip(e.trigger);
-    });
-
-    clipboard.on('error', function (e) {
-        console.error('Action:', e.action);
-        console.error('Trigger:', e.trigger);
-        setTooltip(e.trigger, fallbackMessage(e.action));
-        hideTooltip(e.trigger);
-    });
-
-    function getCopyData(subreddit, reddit_title, filename, background_credit) {
-
-        if (subreddit == undefined) {
-            subredditCopy = "";
-        } else {
-            subredditCopy = "r/" + subreddit + "\n\n";
+    function sourceUrl(subreddit, id) {
+        if (subreddit === "threads") {
+            return `https://www.threads.net/post/${id}`;
         }
-
-        const file = filename.slice(0, -4);
-        if (reddit_title == file) {
-            titleCopy = reddit_title;
-        } else {
-            titleCopy = file;
-        }
-
-        var copyData = "";
-        copyData += subredditCopy;
-        copyData += titleCopy;
-        copyData += "\n\nBackground credit: " + background_credit;
-        return copyData;
-    }
-
-    function getLink(subreddit, id, reddit_title) {
-        if (subreddit == undefined) {
-            return reddit_title;
-        } else {
-            return "<a target='_blank' href='https://www.reddit.com/r/" + subreddit + "/comments/" + id + "/'>" + reddit_title + "</a>";
-        }
+        return `https://www.reddit.com/r/${subreddit}/comments/${id}/`;
     }
 
     function checkTitle(reddit_title, filename) {
         const file = filename.slice(0, -4);
-        if (reddit_title == file) {
-            return reddit_title;
-        } else {
-            return file;
+        return reddit_title === file ? reddit_title : file;
+    }
+
+    // Escape arbitrary strings for safe embedding inside HTML attributes
+    function h(str) {
+        return String(str ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/"/g, '&quot;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+    }
+
+    async function loadVideos() {
+        try {
+            const response = await fetch("videos.json");
+            const data = await response.json();
+            data.sort((b, a) => a['time'] - b['time']);
+
+            const container = document.getElementById('videos');
+            // Use data-* attributes for arbitrary strings — never embed them in onclick/href
+            container.innerHTML = data.map(v => {
+                const title = checkTitle(v.reddit_title, v.filename);
+                return `
+                <div class="video-card group bg-slate-800 rounded-xl overflow-hidden border border-white/5 hover:border-indigo-500/50 transition-all duration-300 hover:shadow-2xl hover:shadow-indigo-500/10 relative"
+                     data-video-id="${h(v.id)}">
+
+                    <!-- Checkbox overlay (shown in select mode) -->
+                    <div class="select-overlay hidden absolute top-3 right-3 z-10 pointer-events-none">
+                        <input type="checkbox" class="card-checkbox checkbox checkbox-primary w-6 h-6 pointer-events-auto" />
+                    </div>
+
+                    <button type="button"
+                            class="play-btn aspect-video w-full bg-slate-900 flex items-center justify-center relative overflow-hidden cursor-pointer"
+                            data-video-id="${h(v.id)}"
+                            data-video-title="${h(title)}">
+                        <i data-lucide="play-circle" class="w-12 h-12 text-slate-700 group-hover:text-indigo-500 transition-colors"></i>
+                        <div class="absolute top-3 left-3">
+                            <span class="badge badge-sm bg-slate-900/80 border-none text-indigo-400 font-medium backdrop-blur-md">
+                                ${h(categoryLabel(v.subreddit))}
+                            </span>
+                        </div>
+                    </button>
+
+                    <div class="p-4">
+                        <h3 class="text-slate-200 font-medium line-clamp-2 mb-4 h-12" title="${h(title)}">
+                            ${h(title)}
+                        </h3>
+
+                        <div class="flex items-center justify-between gap-2">
+                            <div class="flex gap-1">
+                                <a href="${h(sourceUrl(v.subreddit, v.id))}" target="_blank"
+                                   class="btn btn-square btn-sm btn-ghost hover:bg-indigo-500/20 hover:text-indigo-400"
+                                   title="View Source">
+                                    <i data-lucide="external-link" class="w-4 h-4"></i>
+                                </a>
+                                <a href="/video/${encodeURIComponent(v.id)}?download=1" download
+                                   class="btn btn-square btn-sm btn-ghost hover:bg-indigo-500/20 hover:text-indigo-400"
+                                   title="Download">
+                                    <i data-lucide="download" class="w-4 h-4"></i>
+                                </a>
+                            </div>
+
+                            <div class="flex gap-1">
+                                <button class="btn btn-square btn-sm btn-ghost hover:bg-slate-700 copy-btn"
+                                        data-copy="${h(sourceUrl(v.subreddit, v.id))}"
+                                        title="Copy Link">
+                                    <i data-lucide="link" class="w-4 h-4"></i>
+                                </button>
+                                <button class="btn btn-square btn-sm btn-ghost hover:bg-red-500/20 hover:text-red-400 delete-btn"
+                                        data-video-id="${h(v.id)}"
+                                        title="Delete">
+                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="mt-4 pt-4 border-t border-white/5 flex justify-between items-center">
+                            <span class="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">
+                                ${timeSince(v.time)}
+                            </span>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+
+            // Wire play buttons — in select mode, toggle checkbox instead of playing
+            container.querySelectorAll('.play-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    if (selectMode) {
+                        const card = btn.closest('.video-card');
+                        const cb = card.querySelector('.card-checkbox');
+                        cb.checked = !cb.checked;
+                        updateSelectionCount();
+                    } else {
+                        openPlayer(`/video/${encodeURIComponent(btn.dataset.videoId)}`, btn.dataset.videoTitle);
+                    }
+                });
+            });
+
+            // Wire copy buttons
+            container.querySelectorAll('.copy-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    navigator.clipboard.writeText(btn.dataset.copy).then(() => {
+                        const orig = btn.innerHTML;
+                        btn.innerHTML = '<i data-lucide="check" class="w-4 h-4 text-green-500"></i>';
+                        lucide.createIcons();
+                        setTimeout(() => { btn.innerHTML = orig; lucide.createIcons(); }, 2000);
+                    });
+                });
+            });
+
+            // Wire single-delete buttons
+            container.querySelectorAll('.delete-btn').forEach(btn => {
+                btn.addEventListener('click', () => confirmSingleDelete(btn.dataset.videoId));
+            });
+
+            // Wire checkboxes to update the bulk-delete counter
+            container.querySelectorAll('.card-checkbox').forEach(cb => {
+                cb.addEventListener('change', updateSelectionCount);
+            });
+
+            // Re-init icons
+            lucide.createIcons();
+        } catch (error) {
+            console.error("Error loading videos:", error);
         }
     }
 
-    var searchFilter = () => {
-        const input = document.querySelector(".searchFilter");
-        const cards = document.getElementsByClassName("col");
-        console.log(cards[1])
-        let filter = input.value
-        for (let i = 0; i < cards.length; i++) {
-            let title = cards[i].querySelector(".card-text");
-            if (title.innerText.toLowerCase().indexOf(filter.toLowerCase()) > -1) {
-                cards[i].classList.remove("d-none")
-            } else {
-                cards[i].classList.add("d-none")
-            }
-        }
+    // ── Select mode ────────────────────────────────────────────────────────────
+    let selectMode = false;
+    let pendingDeleteIds = [];
+
+    function toggleSelectMode() {
+        selectMode = true;
+        document.getElementById('bulk-bar').classList.remove('hidden');
+        document.getElementById('bulk-bar').classList.add('flex');
+        document.getElementById('normal-toolbar').classList.add('hidden');
+        document.querySelectorAll('.select-overlay').forEach(el => el.classList.remove('hidden'));
+        document.querySelectorAll('.card-checkbox').forEach(cb => cb.checked = false);
+        updateSelectionCount();
+        lucide.createIcons();
     }
+
+    function cancelSelectMode() {
+        selectMode = false;
+        document.getElementById('bulk-bar').classList.add('hidden');
+        document.getElementById('bulk-bar').classList.remove('flex');
+        document.getElementById('normal-toolbar').classList.remove('hidden');
+        document.querySelectorAll('.select-overlay').forEach(el => el.classList.add('hidden'));
+        document.querySelectorAll('.card-checkbox').forEach(cb => cb.checked = false);
+        updateSelectionCount();
+    }
+
+    function selectAll() {
+        const checkboxes = document.querySelectorAll('.card-checkbox');
+        const allChecked = [...checkboxes].every(cb => cb.checked);
+        checkboxes.forEach(cb => cb.checked = !allChecked);
+        document.getElementById('select-all-label').textContent = allChecked ? 'Select All' : 'Deselect All';
+        updateSelectionCount();
+    }
+
+    function updateSelectionCount() {
+        const count = document.querySelectorAll('.card-checkbox:checked').length;
+        document.getElementById('selection-count').textContent = count;
+        document.getElementById('bulk-delete-btn').disabled = count === 0;
+    }
+
+    function getSelectedIds() {
+        return [...document.querySelectorAll('.card-checkbox:checked')]
+            .map(cb => cb.closest('.video-card').dataset.videoId);
+    }
+
+    // ── Delete confirmation ─────────────────────────────────────────────────
+    function confirmBulkDelete() {
+        pendingDeleteIds = getSelectedIds();
+        if (!pendingDeleteIds.length) return;
+        const n = pendingDeleteIds.length;
+        document.getElementById('delete-modal-msg').textContent =
+            `Are you sure you want to delete ${n} video${n !== 1 ? 's' : ''}? This cannot be undone.`;
+        document.getElementById('delete_modal').showModal();
+    }
+
+    function confirmSingleDelete(videoId) {
+        pendingDeleteIds = [videoId];
+        document.getElementById('delete-modal-msg').textContent =
+            'Are you sure you want to delete this video? This cannot be undone.';
+        document.getElementById('delete_modal').showModal();
+    }
+
+    async function executeDelete() {
+        document.getElementById('delete_modal').close();
+        if (!pendingDeleteIds.length) return;
+
+        const ids = [...pendingDeleteIds];
+        pendingDeleteIds = [];
+
+        try {
+            await fetch('/videos/delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids })
+            });
+        } catch (err) {
+            console.error('Delete request failed:', err);
+        }
+
+        // Remove cards from DOM regardless (optimistic UI)
+        ids.forEach(id => {
+            const card = document.querySelector(`.video-card[data-video-id="${CSS.escape(id)}"]`);
+            if (card) card.remove();
+        });
+
+        // Show empty state if nothing remains
+        const remaining = document.querySelectorAll('.video-card:not(.hidden)').length;
+        document.getElementById('empty-state').classList.toggle('hidden', remaining > 0);
+
+        if (selectMode) cancelSelectMode();
+    }
+
+    function searchFilter() {
+        const query = document.querySelector(".searchFilter").value.toLowerCase();
+        const cards = document.querySelectorAll(".video-card");
+        let visibleCount = 0;
+
+        cards.forEach(card => {
+            const text = card.textContent.toLowerCase();
+            const matches = text.includes(query);
+            card.classList.toggle('hidden', !matches);
+            if (matches) visibleCount++;
+        });
+
+        document.getElementById('empty-state').classList.toggle('hidden', visibleCount > 0);
+    }
+
+    function openPlayer(src, title) {
+        const modal = document.getElementById('player_modal');
+        const video = document.getElementById('player_video');
+        const titleEl = document.getElementById('player_title');
+        titleEl.textContent = title || '';
+        video.src = src;
+        modal.showModal();
+        video.play().catch(() => {});
+    }
+
+    function closePlayer() {
+        const modal = document.getElementById('player_modal');
+        const video = document.getElementById('player_video');
+        video.pause();
+        video.removeAttribute('src');
+        video.load();
+        modal.close();
+    }
+
+    document.getElementById('player_modal').addEventListener('close', () => {
+        const video = document.getElementById('player_video');
+        video.pause();
+        video.removeAttribute('src');
+        video.load();
+    });
+
+    document.addEventListener('DOMContentLoaded', loadVideos);
 </script>
+
 {% endblock %}

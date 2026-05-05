@@ -1,4 +1,8 @@
+import io
+import json
 import os
+import sys
+import threading
 import webbrowser
 from pathlib import Path
 
@@ -6,9 +10,12 @@ from pathlib import Path
 import tomlkit
 from flask import (
     Flask,
+    abort,
+    jsonify,
     redirect,
     render_template,
     request,
+    send_file,
     send_from_directory,
     url_for,
 )
@@ -99,19 +106,136 @@ def videos_json():
 # Make backgrounds.json accessible
 @app.route("/backgrounds.json")
 def backgrounds_json():
-    return send_from_directory("utils", "backgrounds.json")
+    return send_from_directory("utils", "background_videos.json")
 
 
 # Make videos in results folder accessible
 @app.route("/results/<path:name>")
 def results(name):
-    return send_from_directory("results", name, as_attachment=True)
+    as_attachment = request.args.get("download", "0").lower() in {"1", "true", "yes"}
+    return send_from_directory("results", name, as_attachment=as_attachment)
+
+
+# Serve a video by its videos.json id (handles filenames with unsafe chars like newlines)
+@app.route("/video/<video_id>")
+def video_by_id(video_id):
+    try:
+        with open("video_creation/data/videos.json", "r", encoding="utf-8") as f:
+            videos = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        abort(404)
+
+    entry = next((v for v in videos if v.get("id") == video_id), None)
+    if not entry:
+        abort(404)
+
+    subreddit = entry.get("subreddit", "")
+    filename = entry.get("filename", "")
+    file_path = (Path("results") / subreddit / filename).resolve()
+    results_root = Path("results").resolve()
+
+    # Prevent path traversal: ensure resolved file is inside results/
+    try:
+        file_path.relative_to(results_root)
+    except ValueError:
+        abort(404)
+
+    if not file_path.is_file():
+        abort(404)
+
+    as_attachment = request.args.get("download", "0").lower() in {"1", "true", "yes"}
+    safe_name = filename.replace("\n", " ").replace("\r", " ").strip() or f"{video_id}.mp4"
+    return send_file(file_path, as_attachment=as_attachment, download_name=safe_name)
+
+
+# Delete one or more videos by ID
+@app.route("/videos/delete", methods=["POST"])
+def video_delete():
+    data = request.get_json(silent=True) or {}
+    ids = data.get("ids", [])
+    if not ids or not isinstance(ids, list):
+        return jsonify({"error": "No IDs provided"}), 400
+    deleted = gui.delete_videos(ids)
+    return jsonify({"deleted": deleted})
 
 
 # Make voices samples in voices folder accessible
 @app.route("/voices/<path:name>")
 def voices(name):
     return send_from_directory("GUI/voices", name, as_attachment=True)
+
+
+# --- Pipeline state (shared across thread + HTTP) ---
+pipeline_lock = threading.Lock()
+pipeline_state: dict = {
+    "running": False,
+    "stage": "",
+    "error": None,
+    "result": None,  # {"title": ..., "file": ..., "url": ...}
+    "log": [],       # Last N status messages
+}
+
+
+def _run_pipeline():
+    """Run the video creation pipeline in a background thread."""
+    import toml
+    from utils import console as uconsole
+    from utils import settings
+
+    with pipeline_lock:
+        pipeline_state["running"] = True
+        pipeline_state["stage"] = "configuring"
+        pipeline_state["error"] = None
+        pipeline_state["result"] = None
+        pipeline_state["log"] = []
+
+    try:
+        # Load config
+        settings.config = toml.load("config.toml")
+
+        # Set up progress callback
+        def on_progress(stage=""):
+            with pipeline_lock:
+                pipeline_state["stage"] = stage
+                pipeline_state["log"].append(stage)
+                if len(pipeline_state["log"]) > 20:
+                    pipeline_state["log"] = pipeline_state["log"][-20:]
+
+        uconsole.set_progress_callback(on_progress)
+
+        from main import main as run_pipeline
+        run_pipeline()
+
+        with pipeline_lock:
+            pipeline_state["stage"] = "done"
+            pipeline_state["result"] = {"message": "Video created successfully! Check the home page."}
+
+    except Exception as e:
+        with pipeline_lock:
+            pipeline_state["stage"] = "error"
+            pipeline_state["error"] = str(e)[:500].encode("ascii", errors="replace").decode("ascii")
+    finally:
+        with pipeline_lock:
+            pipeline_state["running"] = False
+        uconsole.set_progress_callback(None)
+
+
+@app.route("/create", methods=["GET", "POST"])
+def create():
+    if request.method == "POST":
+        if pipeline_state["running"]:
+            return jsonify({"status": "already_running"})
+        thread = threading.Thread(target=_run_pipeline, daemon=True)
+        thread.start()
+        return jsonify({"status": "started"})
+    return render_template("create.html", state=pipeline_state)
+
+
+@app.route("/create/status")
+def create_status():
+    with pipeline_lock:
+        state_copy = dict(pipeline_state)
+    return jsonify(state_copy)
 
 
 # Run browser and start the app

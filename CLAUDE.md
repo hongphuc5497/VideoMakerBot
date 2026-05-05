@@ -5,16 +5,18 @@
 **VideoMakerBot** — Automated short-form video creator from social media content.
 
 **Status:** Production-ready, actively maintained (v3.4.0)
-**Language:** Python 3.10+
+**Language:** Python 3.10 (locked by `Dockerfile`; host venv may use 3.14 for tooling only)
+**Runtime:** **Docker only** — all CLI, GUI, and test invocations go through `docker compose`. Do not invoke `python` on the host.
 **Platforms:** Reddit (PRAW API), Threads (Graph API + Web Scraping)
 
 ### Core Mission
 Transforms social media threads (post + comments/replies) into complete short-form videos with:
 - AI-generated speech (7+ TTS providers)
-- UI screenshots (Playwright)
+- UI screenshots (Playwright, headless Chromium pre-installed in image)
 - Background video/audio overlays
-- FFmpeg composition & output
+- FFmpeg composition & output (Linux ffmpeg with full filter set, including `drawtext`)
 - Optional YouTube upload
+- Modern web UI (Tailwind CSS + DaisyUI + Lucide + vanilla ES6) on `localhost:4000`
 
 ---
 
@@ -101,8 +103,21 @@ VideoMakerBot/
 │   ├── background_audios.json        # Background audio manifest
 │   └── ...
 │
+├── GUI/                              # Flask templates (Tailwind + DaisyUI + Lucide)
+│   ├── layout.html                   # Base layout (no jQuery, no Bootstrap)
+│   ├── index.html                    # Video Library (3 buttons: source / download / copy link)
+│   ├── backgrounds.html              # Background Manager (videos catalog)
+│   ├── settings.html                 # Config editor (validated against template)
+│   └── create.html                   # Render progress page
+│
+├── tests/
+│   └── test_gui_utils.py             # pytest regression for add/delete background
+│
 ├── main.py                           # CLI entry (platform-routed via factory)
-├── GUI.py                            # Flask web UI (localhost:4000)
+├── GUI.py                            # Flask web UI; `/video/<id>` serves files with sanitized headers
+├── Dockerfile                        # python:3.10-slim-bookworm + ffmpeg + playwright + pytest
+├── docker-compose.yml                # Services: gui, cli, test
+├── docker-entrypoint.sh              # Runs `utils.docker_bootstrap` then exec's the command
 ├── requirements.txt
 └── CLAUDE.md
 ```
@@ -229,33 +244,40 @@ Last 1-4: engagement metrics (likes, replies, reposts, quotes)
 
 ### ✅ DO:
 
-1. **Use platform factory** — never import platform modules directly
-2. **Return standard content_object** from all fetchers
-3. **Use clean body text** for TTS — parse out username/timestamp metadata
-4. **Default to `googletranslate` TTS on macOS** — pyttsx3 hangs in headless environments
-5. **Use `libx264` encoder on macOS** — `h264_nvenc` is NVIDIA-only
-6. **Test both Threads discovery methods:** `api` and `scrape`
+1. **Run everything through Docker** — `docker compose up gui`, `docker compose run --rm cli`, `docker compose run --rm test`
+2. **Use platform factory** — never import platform modules directly
+3. **Return standard content_object** from all fetchers
+4. **Use clean body text** for TTS — parse out username/timestamp metadata
+5. **Default to `googletranslate` TTS** for headless containers — no API key, fast, free
+6. **Use `libx264` encoder** — `h264_nvenc` is NVIDIA-only and not available in the slim image
+7. **Test both Threads discovery methods:** `api` and `scrape`
+8. **Bind-mount preserves state** — edits to `config.toml`, `results/`, `assets/temp/`, `video_creation/data/`, and the `utils/background_*.json` catalogs persist across container runs
+9. **GUI must bind to `0.0.0.0`** in Docker (already enforced via `GUI_HOST=0.0.0.0` env)
+10. **Use `/video/<id>` to serve renders** — the route looks up the file by id in `videos.json`, sanitizes the `Content-Disposition` filename, and avoids 404s caused by literal newlines in titles
 
 ### ❌ DON'T:
 
-1. **Don't use `<article>` selectors** on Threads.net — the DOM is div-based
-2. **Don't hardcode `h264_nvenc`** — use `libx264` for cross-platform compatibility
-3. **Don't rely on `drawtext` FFmpeg filter** — not available in Homebrew builds
+1. **Don't run `python GUI.py` or `python main.py` on the host** — Docker is the only supported path
+2. **Don't use `<article>` selectors** on Threads.net — the DOM is div-based
+3. **Don't hardcode `h264_nvenc`** — use `libx264` for cross-platform compatibility
 4. **Don't import platform modules directly** in main.py/utils
 5. **Don't assume config keys exist** without `.get()` fallback
+6. **Don't reintroduce jQuery, Bootstrap, or ClipboardJS** — the UI is vanilla ES6 + Tailwind + DaisyUI + Lucide
+7. **Don't write to `utils/backgrounds.json`** — it is a legacy empty file. Use `utils/background_videos.json` and `utils/background_audios.json`
 
 ---
 
-## macOS-Specific Notes
+## Web UI (Flask, served by `gui` service)
 
-- **TTS:** `googletranslate` (gTTS) is the most reliable — free, fast, no API key
-  - `tiktok` auto-falls back to `pyttsx3` if sessionid missing, but pyttsx3 is very slow
-  - `pyttsx3` works but takes ~60s to initialize NSSpeechSynthesizer
-- **FFmpeg encoder:** MUST use `libx264` — `h264_nvenc` is NVIDIA GPU only
-- **FFmpeg filters:** `drawtext` missing from Homebrew bottle — credit text is disabled
-- **yt-dlp:** Keep updated (`pip install --upgrade yt-dlp`) — YouTube changes APIs frequently
-  - Format selector: `best[height<=1080]` not `bestvideo` (many videos lack video-only streams)
-  - Upgrade path: `pip install --upgrade yt-dlp`
+- **Stack:** Tailwind CSS, DaisyUI, Lucide Icons, vanilla ES6 (no jQuery, no Bootstrap, no ClipboardJS)
+- **Routes:**
+  - `/` — Video Library; cards show source-post link, download, and copy-link buttons
+  - `/video/<id>` — serves the rendered mp4 by id (lookup via `videos.json`); guards path-traversal and sanitizes the filename for `Content-Disposition`
+  - `/backgrounds` — Background Manager UI
+  - `/backgrounds.json` — serves `utils/background_videos.json` (the videos catalog)
+  - `/background/add`, `/background/delete` — POST endpoints; mutate **both** `utils/background_videos.json` and the `settings.background.background_video.options` array in `utils/.config.template.toml`
+  - `/settings` — config editor; loads from `config.toml`, validates against `utils/.config.template.toml`, persists via `utils/gui_utils.modify_settings` (preserves comments/formatting via `tomlkit`)
+- **HTML escaping:** the `h()` helper in `index.html` escapes `& " < >` for any user-controlled string embedded in attributes — use it for any new dynamic data on the Library page
 
 ---
 
@@ -277,64 +299,79 @@ Last 1-4: engagement metrics (likes, replies, reposts, quotes)
 | `reddit/subreddit.py` | PRAW Reddit fetcher with auto-2FA |
 | `utils/settings.py` | Config loading + interactive validation |
 | `utils/videos.py` | Video dedup tracking |
-| `utils/.config.template.toml` | Config schema |
-| `utils/background_videos.json` | Background video manifest |
+| `utils/.config.template.toml` | Config schema (also drives Settings page validation) |
+| `utils/background_videos.json` | Background video manifest (served at `/backgrounds.json`) |
 | `utils/background_audios.json` | Background audio manifest |
+| `utils/gui_utils.py` | `add_background`, `delete_background`, `modify_settings`, `get_checks` |
+| `GUI.py` | Flask app: `/`, `/video/<id>`, `/backgrounds`, `/settings`, `/create` |
+| `Dockerfile` | python:3.10-slim-bookworm + ffmpeg + Playwright Chromium + pytest |
+| `docker-compose.yml` | Three services: `gui` (port 4000), `cli`, `test` |
+| `tests/test_gui_utils.py` | Pytest regression for Background Manager round-trip |
 
 ---
 
 ## Debugging Tips
 
 ### FFmpeg "Unknown encoder 'h264_nvenc'"
-→ On macOS, change to `libx264`. Find-and-replace `h264_nvenc` → `libx264` in `video_creation/final_video.py`.
-
-### FFmpeg "No such filter: 'drawtext'"
-→ Homebrew FFmpeg lacks drawtext. The credit text overlay is automatically skipped.
+→ Use `libx264`. Find-and-replace `h264_nvenc` → `libx264` in `video_creation/final_video.py`. The slim image does not ship with NVIDIA encoders.
 
 ### yt-dlp "Requested format is not available"
-→ Update yt-dlp: `pip install --upgrade yt-dlp`. Also change format selector from `bestvideo` to `best` in `video_creation/background.py`.
-
-### pyttsx3 hang on macOS
-→ NSSpeechSynthesizer needs GUI session. Switch to `voice_choice = "googletranslate"` for headless use.
+→ Bump the pinned version in `requirements.txt` and rebuild (`docker compose build`). Also prefer `best[height<=1080]` over `bestvideo` in `video_creation/background.py` — many videos lack video-only streams.
 
 ### Threads screenshots fail ("Main post article not found")
 → Threads.net uses div cards, not `<article>`. Ensure screenshot code uses `a[href*="/post/"]` → ancestor div approach.
 
 ### Config validator EOFError in non-interactive mode
-→ `check_toml()` prompts for ALL platform sections regardless of `platform` setting. Fill ALL required fields or load config directly with `toml.load()` + `settings.config = ...`.
+→ `check_toml()` prompts for ALL platform sections regardless of `platform` setting. Either fill all required fields, edit through `/settings`, or pre-populate `config.toml` before `docker compose run cli`.
 
 ### Playwright timeout on Threads login
-→ Cookies corrupted. Delete `video_creation/data/cookie-threads.json` for fresh login. Also check button selector: must use `exact=True` due to multiple "Log in" buttons.
+→ Cookies corrupted. Delete `video_creation/data/cookie-threads.json` for fresh login (the file is bind-mounted, so deleting on host clears the container too). Also confirm selectors: button uses `exact=True` due to multiple "Log in" buttons.
 
 ### No viral posts found
 → Lower `min_engagement` in config. Most Threads feed posts have <100 likes — 10000 filters almost everything.
 
+### Background Manager grid is empty
+→ `/backgrounds.json` must serve `utils/background_videos.json` (split catalog), **not** the legacy `utils/backgrounds.json` (empty `{}`). Verify in `GUI.py:backgrounds_json`.
+
+### `/video/<id>` returns 404
+→ The route looks up the entry in `video_creation/data/videos.json` by `id` and resolves the file under `results/<thread_category>/<filename>.mp4`. Confirm both the JSON entry and the file exist; the file may have been pruned.
+
+### JS "Unexpected end of input" on Library page
+→ Any user-controlled string interpolated into an HTML attribute must go through the `h()` helper in `index.html`. Avoid inline `onclick=` with `${JSON.stringify(...)}`.
+
+### Stale image after editing `requirements.txt` or `Dockerfile`
+→ `docker compose build` to rebuild. Code changes alone do NOT need a rebuild because the repo root is bind-mounted to `/app`.
+
 ---
 
-## Useful Commands
+## Useful Commands (Docker-only)
 
 ```bash
-# Install dependencies
-pip install -r requirements.txt
+# Build (or rebuild after Dockerfile / requirements.txt changes)
+docker compose build
 
-# Run CLI
-python3 main.py
+# Run the GUI (foreground)
+docker compose up gui
+# → http://localhost:4000
 
-# Run bypassing config validator (non-interactive)
-python3 -c "
-import sys, toml
-sys.path.insert(0, '.')
-from utils import settings
-settings.config = toml.load('config.toml')
-from main import main; main()
-"
+# Run the GUI in the background
+docker compose up -d gui
+docker compose logs -f gui
+docker compose down
 
-# Update yt-dlp (YouTube downloads fix)
-pip install --upgrade yt-dlp
+# Run the CLI pipeline (one-off, removed on exit)
+docker compose run --rm cli
+docker compose run --rm cli python main.py <post_id>
 
-# Check syntax
-python3 -m py_compile main.py platforms/threads/scraper.py
+# Run the test suite
+docker compose run --rm test
 
-# Run Flask GUI
-python3 GUI.py
+# Open a shell in a fresh container for ad-hoc commands
+docker compose run --rm --entrypoint /bin/bash gui
+# inside:  python -m py_compile main.py platforms/threads/scraper.py
+
+# Tail a running GUI container
+docker compose exec gui ls /app/results/threads/
 ```
+
+> Anything that needs `pip install`, `playwright install`, or `apt-get` belongs in `Dockerfile` followed by `docker compose build` — never run those on the host.

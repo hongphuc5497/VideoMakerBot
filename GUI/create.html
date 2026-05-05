@@ -1,0 +1,245 @@
+{% extends "layout.html" %}
+{% block main %}
+
+<div class="bg-slate-900 min-h-screen py-12">
+    <div class="container mx-auto px-4 max-w-2xl">
+        <div class="card bg-slate-800 border border-white/5 shadow-2xl">
+            <div class="card-body p-8">
+                <div class="flex items-center gap-4 mb-8">
+                    <div class="bg-indigo-600/20 p-3 rounded-xl">
+                        <i data-lucide="plus-square" class="w-8 h-8 text-indigo-500"></i>
+                    </div>
+                    <div>
+                        <h2 class="card-title text-2xl text-white">Create New Short</h2>
+                        <p class="text-slate-400 text-sm">Start the automated video creation pipeline.</p>
+                    </div>
+                </div>
+
+                <div class="space-y-8">
+                    <!-- Action Button -->
+                    <button id="create-btn" class="btn btn-indigo btn-lg w-full bg-indigo-600 hover:bg-indigo-500 border-none text-white h-16 text-lg"
+                            onclick="startPipeline()" disabled>
+                        <span id="btn-text">Start Generation</span>
+                        <span id="btn-spinner" class="loading loading-spinner loading-md hidden"></span>
+                    </button>
+
+                    <!-- Progress Visualization -->
+                    <div id="progress-area" class="hidden space-y-4 animate-in fade-in duration-500">
+                        <div class="flex justify-between items-end">
+                            <div class="space-y-1">
+                                <span class="text-xs uppercase tracking-widest text-slate-500 font-bold">Current Stage</span>
+                                <div class="flex items-center gap-2">
+                                    <div class="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></div>
+                                    <h3 id="stage-text" class="text-indigo-400 font-semibold text-lg capitalize">Preparing...</h3>
+                                </div>
+                            </div>
+                            <span id="pct-text" class="text-2xl font-black text-slate-700 font-mono">0%</span>
+                        </div>
+
+                        <progress id="progress-bar" class="progress progress-indigo w-full h-3 bg-slate-900" value="0" max="100"></progress>
+
+                        <div class="grid grid-cols-2 gap-4 pt-4">
+                            <div class="bg-slate-900/50 p-3 rounded-lg border border-white/5 flex items-center gap-3">
+                                <i data-lucide="clock" class="w-4 h-4 text-slate-500"></i>
+                                <div class="flex flex-col">
+                                    <span class="text-[10px] uppercase text-slate-500 font-bold">Elapsed</span>
+                                    <span id="elapsed-time" class="text-sm font-mono text-slate-300">00:00</span>
+                                </div>
+                            </div>
+                            <div class="bg-slate-900/50 p-3 rounded-lg border border-white/5 flex items-center gap-3">
+                                <i data-lucide="layers" class="w-4 h-4 text-slate-500"></i>
+                                <div class="flex flex-col">
+                                    <span class="text-[10px] uppercase text-slate-500 font-bold">Status</span>
+                                    <span class="text-sm text-indigo-400">Processing</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Success Message -->
+                    <div id="done-area" class="hidden animate-in zoom-in duration-300">
+                        <div class="alert bg-emerald-500/10 border-emerald-500/20 text-emerald-400 flex flex-col items-start gap-4 p-6">
+                            <div class="flex items-center gap-3">
+                                <div class="bg-emerald-500 text-slate-900 p-1 rounded-full">
+                                    <i data-lucide="check" class="w-4 h-4"></i>
+                                </div>
+                                <span class="font-bold text-lg">Generation Complete!</span>
+                            </div>
+                            <p id="done-msg" class="text-slate-300 text-sm">Your video has been rendered and saved to the library.</p>
+                            <a href="/" class="btn btn-emerald btn-sm bg-emerald-600 hover:bg-emerald-500 border-none text-white px-6">View Video</a>
+                        </div>
+                    </div>
+
+                    <!-- Error Message -->
+                    <div id="error-area" class="hidden">
+                        <div class="alert bg-red-500/10 border-red-500/20 text-red-400 p-6">
+                            <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+                            <div>
+                                <h3 class="font-bold">Pipeline Failed</h3>
+                                <div id="error-text" class="text-xs mt-2 font-mono bg-black/20 p-3 rounded overflow-x-auto whitespace-pre-wrap"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Log Output -->
+                    <div id="log-area" class="hidden space-y-3">
+                        <div class="flex items-center justify-between">
+                            <h4 class="text-xs uppercase tracking-widest text-slate-500 font-bold">Execution Logs</h4>
+                            <span class="badge badge-outline border-slate-700 text-slate-500 text-[10px]">Real-time</span>
+                        </div>
+                        <div id="log-list" class="bg-slate-900 rounded-xl p-4 font-mono text-[11px] leading-relaxed text-slate-400 h-48 overflow-y-auto border border-white/5 shadow-inner">
+                            <!-- Logs will appear here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let pollTimer = null;
+    let startTime = null;
+    let elapsedTimer = null;
+
+    const stageWeights = {
+        'configuring': 5,
+        'discovering': 15,
+        'scraping': 20,
+        'fetching': 25,
+        'saving': 35,
+        'tts': 45,
+        'screenshots': 60,
+        'background': 70,
+        'chopping': 75,
+        'creating': 80,
+        'rendering': 90,
+        'done': 100,
+        'error': 0
+    };
+
+    function updateElapsedTime() {
+        if (!startTime) return;
+        const now = new Date();
+        const diff = Math.floor((now - startTime) / 1000);
+        const mins = Math.floor(diff / 60).toString().padStart(2, '0');
+        const secs = (diff % 60).toString().padStart(2, '0');
+        document.getElementById('elapsed-time').textContent = `${mins}:${secs}`;
+    }
+
+    function stageProgress(stage) {
+        let pct = 0;
+        const s = stage.toLowerCase();
+        for (let [key, val] of Object.entries(stageWeights)) {
+            if (s.includes(key)) { pct = val; }
+        }
+        return pct;
+    }
+
+    async function startPipeline() {
+        const btn = document.getElementById('create-btn');
+        const btnText = document.getElementById('btn-text');
+        const spinner = document.getElementById('btn-spinner');
+
+        btn.disabled = true;
+        spinner.classList.remove('hidden');
+        btnText.textContent = 'Initializing...';
+
+        document.getElementById('progress-area').classList.remove('hidden');
+        document.getElementById('log-area').classList.remove('hidden');
+        document.getElementById('done-area').classList.add('hidden');
+        document.getElementById('error-area').classList.add('hidden');
+
+        try {
+            const r = await fetch('/create', { method: 'POST' });
+            const data = await r.json();
+
+            if (data.status === 'started' || data.status === 'already_running') {
+                btnText.textContent = 'Processing...';
+                startTime = new Date();
+                elapsedTimer = setInterval(updateElapsedTime, 1000);
+                pollTimer = setInterval(pollStatus, 2000);
+            }
+        } catch (err) {
+            console.error("Failed to start pipeline:", err);
+            btn.disabled = false;
+            spinner.classList.add('hidden');
+            btnText.textContent = 'Retry';
+        }
+    }
+
+    async function pollStatus() {
+        try {
+            const r = await fetch('/create/status');
+            const state = await r.json();
+
+            const stageText = document.getElementById('stage-text');
+            const progressBar = document.getElementById('progress-bar');
+            const pctText = document.getElementById('pct-text');
+            const logList = document.getElementById('log-list');
+
+            stageText.textContent = state.stage || 'Running...';
+            const pct = stageProgress(state.stage || '');
+            progressBar.value = pct;
+            pctText.textContent = `${pct}%`;
+
+            if (state.log && state.log.length > 0) {
+                logList.innerHTML = state.log.map(l =>
+                    `<div class="py-0.5 border-b border-white/5 last:border-0">${l}</div>`
+                ).join('');
+                logList.scrollTop = logList.scrollHeight;
+            }
+
+            if (!state.running) {
+                clearInterval(pollTimer);
+                clearInterval(elapsedTimer);
+                pollTimer = null;
+
+                document.getElementById('btn-spinner').classList.add('hidden');
+
+                if (state.stage === 'done' || state.result) {
+                    progressBar.value = 100;
+                    progressBar.classList.add('progress-success');
+                    document.getElementById('btn-text').textContent = 'Create New';
+                    document.getElementById('done-area').classList.remove('hidden');
+                    if (state.result) {
+                        document.getElementById('done-msg').textContent = state.result.message;
+                    }
+                } else if (state.error) {
+                    progressBar.classList.add('progress-error');
+                    document.getElementById('btn-text').textContent = 'Retry';
+                    document.getElementById('error-area').classList.remove('hidden');
+                    document.getElementById('error-text').textContent = state.error;
+                }
+                document.getElementById('create-btn').disabled = false;
+            }
+        } catch (err) {
+            console.error("Status poll failed:", err);
+        }
+    }
+
+    window.addEventListener('load', async function() {
+        lucide.createIcons();
+        try {
+            const r = await fetch('/create/status');
+            const state = await r.json();
+            const btn = document.getElementById('create-btn');
+
+            if (state.running) {
+                document.getElementById('progress-area').classList.remove('hidden');
+                document.getElementById('log-area').classList.remove('hidden');
+                btn.disabled = true;
+                document.getElementById('btn-spinner').classList.remove('hidden');
+                document.getElementById('btn-text').textContent = 'Running...';
+                startTime = new Date(); // Approximate
+                elapsedTimer = setInterval(updateElapsedTime, 1000);
+                pollTimer = setInterval(pollStatus, 2000);
+            } else {
+                btn.disabled = false;
+            }
+        } catch (err) {
+            console.error("Initial status check failed:", err);
+        }
+    });
+</script>
+{% endblock %}
