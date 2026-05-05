@@ -19,7 +19,7 @@ from video_creation.background import (
     download_background_video,
     get_background_config,
 )
-from video_creation.final_video import make_final_video, name_normalize
+from video_creation.final_video import get_output_path, make_final_video
 from video_creation.voices import save_text_to_mp3
 from video_creation.youtube_uploader import upload_to_youtube
 
@@ -80,22 +80,9 @@ def main(POST_ID=None) -> None:
     # -- YouTube upload (if enabled in config) ---------------------------
     youtube_config = settings.config.get("youtube", {})
     if youtube_config.get("enabled", False):
-        # Compute the video path using the same logic as final_video.py
-        title_raw = reddit_object.get("thread_title", "video")
-        filename = f"{name_normalize(title_raw)[:251]}"
-        platform = settings.config["settings"].get("platform", "reddit")
-        if platform == "reddit":
-            subreddit = (
-                settings.config.get("reddit", {})
-                .get("thread", {})
-                .get("subreddit", "unknown")
-            )
-        else:
-            subreddit = reddit_object.get("thread_category", platform)
-        video_path = f"results/{subreddit}/{filename}.mp4"
-
+        video_path = get_output_path(reddit_object)
         youtube_url = upload_to_youtube(
-            video_path, title_raw, settings.config
+            video_path, reddit_object.get("thread_title", "video"), settings.config
         )
         if youtube_url:
             print_substep(f"YouTube URL: {youtube_url}", "bold green")

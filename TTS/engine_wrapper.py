@@ -58,8 +58,8 @@ class TTSEngine:
         self,
     ):  # adds periods to the end of paragraphs (where people often forget to put them) so tts doesn't blend sentences
         for comment in self.reddit_object["comments"]:
-            # remove links
-            regex_urls = r"((http|https)\:\/\/)?[a-zA-Z0-9\.\/\?\:@\-_=#]+\.([a-zA-Z]){2,6}([a-zA-Z0-9\.\&\/\?\:@\-_=#])*"
+            # remove links — atomic URL pattern (no backtracking)
+            regex_urls = r"https?://\S+|www\.\S+\.\S+"
             comment["comment_body"] = re.sub(regex_urls, " ", comment["comment_body"])
             comment["comment_body"] = comment["comment_body"].replace("\n", ". ")
             comment["comment_body"] = re.sub(r"\bAI\b", "A.I", comment["comment_body"])

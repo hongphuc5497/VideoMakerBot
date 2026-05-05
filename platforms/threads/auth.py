@@ -40,7 +40,9 @@ def login_to_threads(page: Page, _context: BrowserContext) -> None:
     page.locator('input[autocomplete="current-password"]').fill(password)
     page.get_by_role("button", name="Log in", exact=True).first.click()
 
-    page.wait_for_timeout(6000)
+    # Wait for navigation to feed (success) or stay on login (failure)
+    page.wait_for_url("https://www.threads.net/", timeout=15000)
+    page.wait_for_load_state("networkidle")
 
     cookies = _context.cookies()
     Path(THREADS_COOKIE_FILE).parent.mkdir(parents=True, exist_ok=True)

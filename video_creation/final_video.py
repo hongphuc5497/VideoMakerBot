@@ -27,6 +27,22 @@ from utils.videos import save_data
 console = Console()
 
 
+def get_output_path(reddit_obj: dict) -> str:
+    """Compute the output mp4 path from a content object. Shared with main.py."""
+    title_raw = reddit_obj.get("thread_title", "video")
+    filename = f"{name_normalize(title_raw)[:251]}"
+    platform = settings.config["settings"].get("platform", "reddit")
+    if platform == "reddit":
+        subreddit = (
+            settings.config.get("reddit", {})
+            .get("thread", {})
+            .get("subreddit", "unknown")
+        )
+    else:
+        subreddit = reddit_obj.get("thread_category", platform)
+    return f"results/{subreddit}/{filename}.mp4"
+
+
 def _probe_duration(path: str) -> float:
     """Get media duration in seconds using PyAV."""
     with av.open(path) as container:

@@ -4,7 +4,8 @@ client_secret = { optional = false, nmin = 20, nmax = 40, explanation = "The SEC
 username = { optional = false, nmin = 3, nmax = 20, explanation = "The username of your reddit account", example = "JasonLovesDoggo", regex = "^[-_0-9a-zA-Z]+$", oob_error = "A username HAS to be between 3 and 20 characters" }
 password = { optional = false, nmin = 8, explanation = "The password of your reddit account", example = "fFAGRNJru1FTz70BzhT3Zg", oob_error = "Password too short" }
 2fa = { optional = true, type = "bool", options = [true, false, ], default = false, explanation = "Whether you have Reddit 2FA enabled, Valid options are True and False", example = true }
-2fa_secret = { optional = true, default = "", explanation = "TOTP shared secret (base32). If provided, 2FA codes are generated automatically instead of prompting interactively.", example = "JBSWY3DPEHPK3PXP" }
+# WARNING: Treat this secret like a password — it allows anyone to generate valid 2FA codes.
+2fa_secret = { optional = true, default = "", explanation = "TOTP shared secret (base32). If provided, 2FA codes are generated automatically instead of prompting interactively. SECURITY: store this with the same care as a password.", example = "JBSWY3DPEHPK3PXP" }
 
 
 [reddit.thread]
