@@ -1,5 +1,4 @@
-# For production, pin to a digest: FROM python:3.10-slim-bookworm@sha256:...
-FROM python:3.10-slim-bookworm
+FROM python:3.14-slim-bookworm
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -15,10 +14,11 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt ./
-# Pin pip for reproducible builds: --upgrade pip==24.0
+# Pin pip for reproducible builds: --upgrade pip==25.x
 RUN pip install --upgrade pip \
     && pip install -r requirements.txt \
-    && pip install pytest
+    && pip install pytest \
+    && pip cache purge
 
 RUN python -m playwright install --with-deps chromium
 

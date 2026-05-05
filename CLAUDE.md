@@ -5,7 +5,7 @@
 **VideoMakerBot** — Automated short-form video creator from social media content.
 
 **Status:** Production-ready, actively maintained (v3.4.0)
-**Language:** Python 3.14+ (host); Docker image uses python:3.10-slim-bookworm for stability
+**Language:** Python 3.14+ (host + Docker image)
 **Runtime:** **Docker only** — all CLI, GUI, and test invocations go through `docker compose`. Do not invoke `python` on the host.
 **Platforms:** Reddit (PRAW API), Threads (Graph API + Web Scraping)
 
@@ -320,7 +320,7 @@ Last 1-4: engagement metrics (likes, replies, reposts, quotes)
 | `utils/background_audios.json` | Background audio manifest |
 | `utils/gui_utils.py` | `add_background`, `delete_background`, `modify_settings`, `get_checks` (no eval) |
 | `GUI.py` | Flask app: `/`, `/video/<id>`, `/backgrounds`, `/settings`, `/create`; CSRF + security headers |
-| `Dockerfile` | python:3.10-slim-bookworm + ffmpeg + Playwright Chromium + pytest; runs as `appuser` |
+| `Dockerfile` | python:3.14-slim-bookworm + ffmpeg + Playwright Chromium + pytest; runs as `appuser` |
 | `docker-compose.yml` | Three services: `gui` (port 4000), `cli`, `test` |
 | `tests/test_gui_utils.py` | Pytest regression for Background Manager round-trip |
 
