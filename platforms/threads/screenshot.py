@@ -102,8 +102,10 @@ def get_screenshots_of_threads_posts(content_object: dict, screenshot_num: int) 
                     page.wait_for_timeout(2000)
 
                     # Threads.net uses div-based cards for replies too.
-                    # Find the first post link and screenshot its card container.
-                    reply_link = page.locator('a[href*="/post/"]').first
+                    # Target the specific reply by its comment_id in the URL.
+                    # Using .first would pick the main post (appears first in DOM).
+                    reply_id = comment["comment_id"]
+                    reply_link = page.locator(f'a[href*="/{reply_id}"]').first
                     if reply_link.count() and reply_link.is_visible():
                         card = reply_link.locator('xpath=ancestor::div[contains(@class, "x1a2a7pz")][1]')
                         reply_locator = card.first if card.count() else reply_link

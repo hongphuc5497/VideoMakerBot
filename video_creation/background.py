@@ -1,16 +1,24 @@
 import json
 import random
 import re
+import subprocess
 from pathlib import Path
 from random import randrange
 from typing import Any, Dict, Tuple
 
+import av
 import yt_dlp
-from moviepy import AudioFileClip, VideoFileClip
-from moviepy.video.io.ffmpeg_tools import ffmpeg_extract_subclip
+from moviepy import AudioFileClip
 
 from utils import settings
 from utils.console import print_step, print_substep
+
+
+def _probe_duration(path: str) -> float:
+    """Get media duration in seconds using PyAV."""
+    with av.open(path) as container:
+        stream = container.streams[0]
+        return float(stream.duration * stream.time_base)
 
 
 def load_background_options():
@@ -144,24 +152,19 @@ def chop_background(background_config: Dict[str, Tuple], video_length: int, redd
 
     print_step("Finding a spot in the backgrounds video to chop...✂️")
     video_choice = f"{background_config['video'][2]}-{background_config['video'][1]}"
-    background_video = VideoFileClip(f"assets/backgrounds/video/{video_choice}")
+    src = f"assets/backgrounds/video/{video_choice}"
+    out = f"assets/temp/{thread_id}/background.mp4"
     start_time_video, end_time_video = get_start_and_end_times(
-        video_length, background_video.duration
+        video_length, _probe_duration(src)
     )
-    # Extract video subclip
-    try:
-        with VideoFileClip(f"assets/backgrounds/video/{video_choice}") as video:
-            new = video.subclipped(start_time_video, end_time_video)
-            new.write_videofile(f"assets/temp/{thread_id}/background.mp4")
-
-    except (OSError, IOError):  # ffmpeg issue see #348
-        print_substep("FFMPEG issue. Trying again...")
-        ffmpeg_extract_subclip(
-            f"assets/backgrounds/video/{video_choice}",
-            start_time_video,
-            end_time_video,
-            outputfile=f"assets/temp/{thread_id}/background.mp4",
-        )
+    # ffmpeg stream-copy (fast) instead of moviepy re-encode
+    result = subprocess.run([
+        "ffmpeg", "-y", "-ss", str(start_time_video), "-to", str(end_time_video),
+        "-i", src, "-c", "copy", "-avoid_negative_ts", "make_zero", out,
+    ], capture_output=True)
+    if result.returncode != 0:
+        stderr = result.stderr.decode("utf-8", errors="replace")
+        raise RuntimeError(f"ffmpeg background extraction failed: {stderr[-500:]}")
     print_substep("Background video chopped successfully!", style="bold green")
     return background_config["video"][2]
 

@@ -104,7 +104,7 @@ class TTSEngine:
                     self.call_tts(f"{idx}", process_text(comment["comment_body"]))
 
         print_substep("Saved Text to MP3 files successfully.", style="bold green")
-        return self.length, idx
+        return self.length, idx + 1  # count, not last index
 
     def split_post(self, text: str, idx):
         split_files = []

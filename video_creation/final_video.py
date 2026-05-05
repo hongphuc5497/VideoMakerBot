@@ -1,5 +1,4 @@
 import json
-import multiprocessing
 import os
 import re
 import subprocess
@@ -105,21 +104,6 @@ def name_normalize(name: str) -> str:
     return name
 
 
-def prepare_background(reddit_id: str, W: int, H: int) -> str:
-    """Crop background video to match target aspect ratio, re-encode without audio."""
-    input_path = f"assets/temp/{reddit_id}/background.mp4"
-    output_path = f"assets/temp/{reddit_id}/background_noaudio.mp4"
-    _run_ffmpeg([
-        "-i", input_path,
-        "-vf", f"crop=ih*({W}/{H}):ih,scale={W}:{H}",
-        "-c:v", "libx264", "-b:v", "20M",
-        "-an",
-        "-threads", str(multiprocessing.cpu_count()),
-        output_path,
-    ], "prepare_background")
-    return output_path
-
-
 def get_text_height(draw, text, font, max_width):
     lines = textwrap.wrap(text, width=max_width)
     total_height = 0
@@ -202,13 +186,17 @@ def _build_audio_concat_list(input_paths: list[str], list_path: str) -> None:
 def _build_overlay_filter_complex(overlay_items: list[dict], W: int, H: int) -> str:
     """Build a ffmpeg filter_complex string for overlaying images on background.
 
+    Prepends crop+scale on [0:v] so raw background.mp4 can be used directly
+    (no separate prepare_background encode pass needed).
+
     Each overlay item: {path, start_time, duration, opacity, scale_w, scale_h}
     """
     parts = []
-    prev_label = "0:v"  # background is the first input
+    # Crop background to target aspect ratio and scale — merged from prepare_background
+    parts.append(f"[0:v]crop=ih*({W}/{H}):ih,scale={W}:{H}[bg];")
+    prev_label = "bg"
 
     for i, item in enumerate(overlay_items):
-        ov_label = f"ov{i}"
         scaled_label = f"sc{i}"
         faded_label = f"fd{i}"
 
@@ -222,7 +210,7 @@ def _build_overlay_filter_complex(overlay_items: list[dict], W: int, H: int) -> 
         )
         # Overlay with timing
         enable = f"between(t,{item['start_time']},{item['start_time'] + item['duration']})"
-        next_label = f"out{i}" if i < len(overlay_items) - 1 else "outv"
+        next_label = f"out{i}" if i < len(overlay_items) - 1 else "final"
         parts.append(
             f"[{prev_label}][{faded_label}]overlay="
             f"x=(main_w-overlay_w)/2:y=(main_h-overlay_h)/2:"
@@ -230,11 +218,8 @@ def _build_overlay_filter_complex(overlay_items: list[dict], W: int, H: int) -> 
         )
         if i < len(overlay_items) - 1:
             parts.append(";")
-        ov_label = ov_label  # unused, keeps naming consistent
         prev_label = next_label
 
-    # Final scale
-    parts.append(f";[{prev_label}]scale={W}:{H}[final]")
     return "".join(parts)
 
 
@@ -257,8 +242,8 @@ def make_final_video(
 
     print_step("Creating the final video 🎥")
 
-    # --- Step 1: Prepare background ---
-    background_path = prepare_background(reddit_id, W=W, H=H)
+    # --- Step 1: Background path (crop+scale merged into overlay filter) ---
+    background_path = f"assets/temp/{reddit_id}/background.mp4"
 
     # --- Step 2: Concatenate all TTS audio clips ---
     audio_clip_paths = []
@@ -274,7 +259,7 @@ def make_final_video(
             ]
         else:
             audio_clip_paths = [f"assets/temp/{reddit_id}/mp3/title.mp3"]
-            for i in range(number_of_clips + 1):
+            for i in range(number_of_clips):
                 audio_clip_paths.append(f"assets/temp/{reddit_id}/mp3/postaudio-{i}.mp3")
     else:
         audio_clip_paths = [f"assets/temp/{reddit_id}/mp3/title.mp3"]
@@ -303,17 +288,22 @@ def make_final_video(
     screenshot_width = int((W * 45) // 100)
     Path(f"assets/temp/{reddit_id}/png").mkdir(parents=True, exist_ok=True)
 
-    title_template = Image.open("assets/title_template.png")
-    title = reddit_obj["thread_title"]
-    title = name_normalize(title)
-    title_img = create_fancy_thumbnail(title_template, title, "#000000", 5)
-    title_img.save(f"assets/temp/{reddit_id}/png/title.png")
+    platform = settings.config["settings"].get("platform", "reddit")
+
+    # Use actual screenshot for non-Reddit platforms (Threads etc.), Reddit template for Reddit
+    title_img_path = f"assets/temp/{reddit_id}/png/title.png"
+    if platform == "reddit":
+        title_template = Image.open("assets/title_template.png")
+        title = reddit_obj["thread_title"]
+        title = name_normalize(title)
+        title_img = create_fancy_thumbnail(title_template, title, "#000000", 5)
+        title_img.save(title_img_path)
 
     overlay_items = []
     current_time = 0.0
 
     overlay_items.append({
-        "path": f"assets/temp/{reddit_id}/png/title.png",
+        "path": title_img_path,
         "start_time": current_time,
         "duration": audio_clips_durations[0],
         "opacity": opacity,
@@ -335,7 +325,7 @@ def make_final_video(
                     "scale_h": -1,
                 })
         elif settings.config["settings"]["storymodemethod"] == 1:
-            for i in range(number_of_clips + 1):
+            for i in range(number_of_clips):
                 img_path = f"assets/temp/{reddit_id}/png/img{i}.png"
                 if not os.path.exists(img_path):
                     continue
@@ -352,21 +342,21 @@ def make_final_video(
                 })
                 current_time += audio_clips_durations[dur_idx]
     else:
-        for i in range(number_of_clips + 1):
-            img_path = f"assets/temp/{reddit_id}/png/comment_{i}.png"
-            if not os.path.exists(img_path):
-                continue
-            if i >= len(audio_clips_durations):
+        for i in range(number_of_clips):
+            dur_idx = i + 1  # audio_clips_durations[0] is title, [1..N] are comments
+            if dur_idx >= len(audio_clips_durations):
                 break
-            overlay_items.append({
-                "path": img_path,
-                "start_time": current_time,
-                "duration": audio_clips_durations[i],
-                "opacity": opacity,
-                "scale_w": screenshot_width,
-                "scale_h": -1,
-            })
-            current_time += audio_clips_durations[i]
+            img_path = f"assets/temp/{reddit_id}/png/comment_{i}.png"
+            if os.path.exists(img_path):
+                overlay_items.append({
+                    "path": img_path,
+                    "start_time": current_time,
+                    "duration": audio_clips_durations[dur_idx],
+                    "opacity": opacity,
+                    "scale_w": screenshot_width,
+                    "scale_h": -1,
+                })
+            current_time += audio_clips_durations[dur_idx]
 
     # --- Step 5: Build filter_complex and render ---
     filter_complex = _build_overlay_filter_complex(overlay_items, W, H)
@@ -436,9 +426,8 @@ def make_final_video(
             ffmpeg_inputs + [
                 "-filter_complex", filter_complex,
                 "-map", "[final]",
-                "-c:v", "libx264", "-b:v", "20M",
+                "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
                 "-pix_fmt", "yuv420p",
-                "-threads", str(multiprocessing.cpu_count()),
                 "-progress", progress.output_file.name,
                 video_only_path,
             ],
@@ -469,9 +458,8 @@ def make_final_video(
                 ffmpeg_inputs + [
                     "-filter_complex", filter_complex,
                     "-map", "[final]",
-                    "-c:v", "libx264", "-b:v", "20M",
+                    "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
                     "-pix_fmt", "yuv420p",
-                    "-threads", str(multiprocessing.cpu_count()),
                     "-progress", progress2.output_file.name,
                     only_tts_video,
                 ],
