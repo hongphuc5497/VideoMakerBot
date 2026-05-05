@@ -39,7 +39,7 @@ def load_background_options():
         pos = _background_options["video"][name][3]
 
         if pos != "center":
-            _background_options["video"][name][3] = lambda t: ("center", pos + t)
+            _background_options["video"][name][3] = lambda t, p=pos: ("center", p + t)
 
     return _background_options
 
@@ -74,9 +74,25 @@ def get_background_config(mode: str):
         choice = None
 
     # Handle default / not supported background using default option.
-    # Default : pick random from supported background.
+    # Default : pick random from already-downloaded backgrounds if available,
+    # otherwise pick from all supported backgrounds.
     if not choice or choice not in background_options[mode]:
-        choice = random.choice(list(background_options[mode].keys()))
+        if mode == "video":
+            available = [
+                k for k, v in background_options[mode].items()
+                if Path(f"assets/backgrounds/video/{v[2]}-{v[1]}").is_file()
+            ]
+        else:
+            available = [
+                k for k, v in background_options[mode].items()
+                if Path(f"assets/backgrounds/audio/{v[2]}-{v[1]}").is_file()
+            ]
+        if available:
+            choice = random.choice(available)
+            print_substep(f"Picked random {mode} from downloaded: {choice}")
+        else:
+            choice = random.choice(list(background_options[mode].keys()))
+            print_substep(f"No downloaded {mode}s found. Picked: {choice} (will download)")
 
     return background_options[mode][choice]
 

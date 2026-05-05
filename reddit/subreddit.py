@@ -56,8 +56,8 @@ def get_subreddit_threads(POST_ID: str):
     except ResponseException as e:
         if e.response.status_code == 401:
             print("Invalid credentials - please check them in config.toml")
-    except:
-        print("Something went wrong...")
+    except Exception as e:
+        print(f"Something went wrong: {e}")
 
     # Ask user for subreddit input
     print_step("Getting subreddit threads...")

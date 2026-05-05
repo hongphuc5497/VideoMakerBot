@@ -92,55 +92,66 @@ def get_screenshots_of_threads_posts(content_object: dict, screenshot_num: int) 
             print_substep(f"Failed to screenshot main post: {e}", style="red")
             raise
 
-        # Screenshots of replies
+        # Screenshots of replies — capture all from the main post page (single navigation)
         if not storymode:
-            for idx in range(min(screenshot_num, len(content_object["comments"]))):
-                comment = content_object["comments"][idx]
-                try:
-                    page.goto(comment["comment_url"], timeout=0)
-                    page.wait_for_load_state("networkidle")
-                    page.wait_for_timeout(2000)
-
-                    # Threads.net uses div-based cards for replies too.
-                    # Target the specific reply by its comment_id in the URL.
-                    # Using .first would pick the main post (appears first in DOM).
-                    reply_id = comment["comment_id"]
-                    reply_link = page.locator(f'a[href*="/{reply_id}"]').first
-                    if reply_link.count() and reply_link.is_visible():
-                        card = reply_link.locator('xpath=ancestor::div[contains(@class, "x1a2a7pz")][1]')
-                        reply_locator = card.first if card.count() else reply_link
+            num_replies = min(screenshot_num, len(content_object["comments"]))
+            if num_replies > 0:
+                # Scroll to load all replies inline on the post page
+                print_substep("Loading replies on post page...", style="dim")
+                last_count = 0
+                stable_count = 0
+                for _ in range(20):
+                    page.evaluate("window.scrollBy(0, document.body.scrollHeight)")
+                    page.wait_for_timeout(1000)
+                    current = page.locator('a[href*="/post/"]').count()
+                    if current == last_count:
+                        stable_count += 1
+                        if stable_count >= 3:
+                            break
                     else:
-                        reply_locator = page.locator("article").first
-                    if not reply_locator.count() or not reply_locator.is_visible():
-                        print_substep(f"Reply {idx} not found. Skipping...", style="yellow")
-                        continue
+                        stable_count = 0
+                    last_count = current
 
-                    if settings.config["settings"].get("zoom", 1) != 1:
-                        zoom = settings.config["settings"]["zoom"]
-                        page.evaluate(f"document.body.style.zoom={zoom}")
-                        location = reply_locator.bounding_box()
-                        if location:
-                            for k in location:
-                                location[k] = float("{:.2f}".format(location[k] * zoom))
-                            page.screenshot(
-                                clip=location,
-                                path=f"assets/temp/{thread_id}/png/comment_{idx}.png",
-                            )
+                for idx in range(num_replies):
+                    comment = content_object["comments"][idx]
+                    try:
+                        reply_id = comment["comment_id"]
+                        reply_link = page.locator(f'a[href*="/{reply_id}"]').first
+                        if reply_link.count() and reply_link.is_visible():
+                            card = reply_link.locator('xpath=ancestor::div[contains(@class, "x1a2a7pz")][1]')
+                            reply_locator = card.first if card.count() else reply_link
+                            # Scroll element into view so bounding_box works
+                            reply_locator.scroll_into_view_if_needed()
+                            page.wait_for_timeout(300)
+                        else:
+                            print_substep(f"Reply {idx} not found on post page. Skipping...", style="yellow")
+                            continue
+
+                        if settings.config["settings"].get("zoom", 1) != 1:
+                            zoom = settings.config["settings"]["zoom"]
+                            page.evaluate(f"document.body.style.zoom={zoom}")
+                            location = reply_locator.bounding_box()
+                            if location:
+                                for k in location:
+                                    location[k] = float("{:.2f}".format(location[k] * zoom))
+                                page.screenshot(
+                                    clip=location,
+                                    path=f"assets/temp/{thread_id}/png/comment_{idx}.png",
+                                )
+                            else:
+                                reply_locator.screenshot(
+                                    path=f"assets/temp/{thread_id}/png/comment_{idx}.png"
+                                )
                         else:
                             reply_locator.screenshot(
                                 path=f"assets/temp/{thread_id}/png/comment_{idx}.png"
                             )
-                    else:
-                        reply_locator.screenshot(
-                            path=f"assets/temp/{thread_id}/png/comment_{idx}.png"
-                        )
 
-                except Exception as e:
-                    print_substep(f"Error capturing reply {idx}: {e}. Skipping...", style="yellow")
-                    # Don't crash; just skip this reply
-                    continue
+                    except Exception as e:
+                        print_substep(f"Error capturing reply {idx}: {e}. Skipping...", style="yellow")
+                        continue
 
-            print_substep(f"Reply screenshots captured ({min(screenshot_num, len(content_object['comments']))} total).", style="bold green")
+            print_substep(f"Reply screenshots captured ({num_replies} total).", style="bold green")
 
         browser.close()
 

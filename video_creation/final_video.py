@@ -86,6 +86,10 @@ class ProgressFfmpeg(threading.Thread):
 
     def __exit__(self, *args, **kwargs):
         self.stop()
+        try:
+            os.unlink(self.output_file.name)
+        except OSError:
+            pass
 
 
 def name_normalize(name: str) -> str:
@@ -277,6 +281,8 @@ def make_final_video(
     os.unlink(concat_list_path)
 
     # Probe durations
+    if not existing:
+        raise RuntimeError("No audio clips generated — all TTS segments failed to produce output")
     audio_clips_durations = [_probe_duration(p) for p in existing]
 
     # --- Step 3: Mix background audio ---
@@ -326,20 +332,19 @@ def make_final_video(
                 })
         elif settings.config["settings"]["storymodemethod"] == 1:
             for i in range(number_of_clips):
-                img_path = f"assets/temp/{reddit_id}/png/img{i}.png"
-                if not os.path.exists(img_path):
-                    continue
                 dur_idx = i + 1
                 if dur_idx >= len(audio_clips_durations):
                     break
-                overlay_items.append({
-                    "path": img_path,
-                    "start_time": current_time,
-                    "duration": audio_clips_durations[dur_idx],
-                    "opacity": opacity,
-                    "scale_w": screenshot_width,
-                    "scale_h": -1,
-                })
+                img_path = f"assets/temp/{reddit_id}/png/img{i}.png"
+                if os.path.exists(img_path):
+                    overlay_items.append({
+                        "path": img_path,
+                        "start_time": current_time,
+                        "duration": audio_clips_durations[dur_idx],
+                        "opacity": opacity,
+                        "scale_w": screenshot_width,
+                        "scale_h": -1,
+                    })
                 current_time += audio_clips_durations[dur_idx]
     else:
         for i in range(number_of_clips):

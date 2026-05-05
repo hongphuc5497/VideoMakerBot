@@ -35,17 +35,33 @@ BROWSER_URL = os.environ.get("GUI_BROWSER_URL", f"http://localhost:{PORT}")
 # Configure application
 app = Flask(__name__, template_folder="GUI")
 
-# Configure secret key only to use 'flash'
-app.secret_key = b'_5#y2L"F4Q8z\n\xec]/'
+# Configure secret key — env var for production, random per-startup for dev
+app.secret_key = os.environ.get("FLASK_SECRET_KEY") or os.urandom(32)
 
 
-# Ensure responses aren't cached
+# Ensure responses aren't cached + security headers
 @app.after_request
 def after_request(response):
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     response.headers["Expires"] = 0
     response.headers["Pragma"] = "no-cache"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
     return response
+
+
+# Simple CSRF check: require same-origin for all mutating requests
+@app.before_request
+def csrf_check():
+    if request.method in ("POST", "PUT", "PATCH", "DELETE"):
+        origin = request.headers.get("Origin")
+        if origin:
+            # Allow same-origin only (localhost dev ports)
+            from urllib.parse import urlparse
+            origin_host = urlparse(origin).hostname
+            request_host = urlparse(request.host_url).hostname
+            if origin_host not in (request_host, "localhost", "127.0.0.1"):
+                return jsonify({"error": "CSRF check failed"}), 403
 
 
 # Display index.html
@@ -80,6 +96,18 @@ def background_delete():
     return redirect(url_for("backgrounds"))
 
 
+_SENSITIVE_KEYS = {"password", "client_secret", "access_token", "2fa_secret",
+                   "tiktok_sessionid", "elevenlabs_api_key", "openai_api_key"}
+
+
+def _redact_secrets(data: dict) -> dict:
+    """Return a copy with sensitive values masked for safe HTML embedding."""
+    return {
+        k: ("********" if any(s in k for s in _SENSITIVE_KEYS) and v else v)
+        for k, v in data.items()
+    }
+
+
 @app.route("/settings", methods=["GET", "POST"])
 def settings():
     config_load = tomlkit.loads(Path("config.toml").read_text())
@@ -95,7 +123,7 @@ def settings():
         # Change settings
         config = gui.modify_settings(data, config_load, checks)
 
-    return render_template("settings.html", file="config.toml", data=config, checks=checks)
+    return render_template("settings.html", file="config.toml", data=_redact_secrets(config), checks=checks)
 
 
 # Make videos.json accessible
@@ -239,6 +267,17 @@ def _run_pipeline(search_queries=None):
                             pipeline_state["log"] = pipeline_state["log"][-20:]
 
         uconsole.set_progress_callback(on_progress)
+
+        # Reload pipeline modules so code edits take effect without restart
+        import importlib
+        import video_creation.final_video
+        import video_creation.background
+        import platforms.threads.screenshot
+        import main
+        importlib.reload(video_creation.final_video)
+        importlib.reload(video_creation.background)
+        importlib.reload(platforms.threads.screenshot)
+        importlib.reload(main)
 
         from main import main as run_pipeline
         run_pipeline()

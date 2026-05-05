@@ -10,6 +10,8 @@ from utils.console import handle_input
 console = Console()
 config = dict  # autocomplete
 
+_TYPE_COERCION = {"int": int, "float": float, "bool": bool, "str": str}
+
 
 def crawl(obj: dict, func=lambda x, y: print(x, y, end="\n"), path=None):
     if path is None:  # path Default argument value is mutable
@@ -30,8 +32,8 @@ def check(value, checks, name):
         incorrect = True
     if not incorrect and "type" in checks:
         try:
-            value = eval(checks["type"])(value)  # fixme remove eval
-        except:
+            value = _TYPE_COERCION.get(checks["type"], str)(value)
+        except (ValueError, TypeError):
             incorrect = True
 
     if (
@@ -78,7 +80,7 @@ def check(value, checks, name):
             + str(name)
             + "[#F7768E bold]=",
             extra_info=get_check_value("explanation", ""),
-            check_type=eval(get_check_value("type", "False")),  # fixme remove eval
+            check_type=_TYPE_COERCION.get(get_check_value("type", ""), False),
             default=get_check_value("default", NotImplemented),
             match=get_check_value("regex", ""),
             err_message=get_check_value("input_error", "Incorrect input"),
@@ -129,7 +131,8 @@ Overwrite it?(y/n)"""
             try:
                 with open(config_file, "w") as f:
                     f.write("")
-            except:
+                config = {}
+            except (OSError, IOError):
                 console.print(
                     f"[red bold]Failed to overwrite {config_file}. Giving up.\nSuggestion: check {config_file} permissions for the user."
                 )
@@ -143,7 +146,7 @@ Creating it now."""
             with open(config_file, "x") as f:
                 f.write("")
             config = {}
-        except:
+        except (OSError, IOError):
             console.print(
                 f"[red bold]Failed to write to {config_file}. Giving up.\nSuggestion: check the folder's permissions for the user."
             )

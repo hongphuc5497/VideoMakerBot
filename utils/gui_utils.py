@@ -51,8 +51,8 @@ def check(value, checks):
 
     if not incorrect and "type" in checks:
         try:
-            value = eval(checks["type"])(value)  # fixme remove eval
-        except Exception:
+            value = {"int": int, "float": float, "bool": bool, "str": str}.get(checks["type"], str)(value)
+        except (ValueError, TypeError):
             incorrect = True
 
     if (
@@ -178,7 +178,8 @@ def add_background(youtube_uri, filename, citation, position):
         flash('Position is invalid! It can be "center" or decimal number.', "error")
         return
 
-    # Sanitize filename
+    # Sanitize citation to prevent path traversal
+    citation = re.sub(r"[./\\]", "_", citation)
     regex = re.compile(r"^([a-zA-Z0-9\s_-]{1,100})$").match(filename)
 
     if not regex:

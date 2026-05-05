@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Dict, Final
 
 import translators
-from playwright.sync_api import ViewportSize, sync_playwright
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError, ViewportSize, sync_playwright
 from rich.progress import track
 
 from utils import settings
@@ -133,16 +133,12 @@ def get_screenshots_of_reddit_posts(reddit_object: dict, screenshot_num: int):
         page.wait_for_load_state()
         page.wait_for_timeout(5000)
 
-        if page.locator(
-            "#t3_12hmbug > div > div._3xX726aBn29LDbsDtzr_6E._1Ap4F5maDtT1E1YuCiaO0r.D3IL3FD0RFy_mkKLPwL4 > div > div > button"
-        ).is_visible():
-            # This means the post is NSFW and requires to click the proceed button.
-
-            print_substep("Post is NSFW. You are spicy...")
-            page.locator(
-                "#t3_12hmbug > div > div._3xX726aBn29LDbsDtzr_6E._1Ap4F5maDtT1E1YuCiaO0r.D3IL3FD0RFy_mkKLPwL4 > div > div > button"
-            ).click()
-            page.wait_for_load_state()  # Wait for page to fully load
+        # Dismiss NSFW warning overlay if present (generic: finds button in NSFW overlay by role)
+        nsfw_button = page.get_by_role("button", name="yes", exact=False).first
+        if nsfw_button.is_visible():
+            print_substep("Post is NSFW. Attempting to proceed...")
+            nsfw_button.click()
+            page.wait_for_load_state()
 
             # translate code
         if page.locator(
@@ -252,7 +248,7 @@ def get_screenshots_of_reddit_posts(reddit_object: dict, screenshot_num: int):
                         page.locator(f"#t1_{comment['comment_id']}").screenshot(
                             path=f"assets/temp/{reddit_id}/png/comment_{idx}.png"
                         )
-                except TimeoutError:
+                except PlaywrightTimeoutError:
                     del reddit_object["comments"]
                     screenshot_num += 1
                     print("TimeoutError: Skipping screenshot...")

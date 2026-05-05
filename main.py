@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 import math
+import subprocess
 import sys
 from os import name
 from pathlib import Path
-from subprocess import Popen
 from typing import Dict, NoReturn, Union
 
 from platforms import get_content_object, get_screenshot_fn
@@ -110,7 +110,7 @@ def run_many(times) -> None:
             f'on the {x}{("th", "st", "nd", "rd", "th", "th", "th", "th", "th", "th")[x % 10]} iteration of {times}'
         )
         main()
-        Popen("cls" if name == "nt" else "clear", shell=True).wait()
+        subprocess.run(["cls" if name == "nt" else "clear"], shell=(name == "nt"))
 
 
 def shutdown() -> NoReturn:
@@ -158,7 +158,7 @@ if __name__ == "__main__":
                     f'on the {index}{("st" if index % 10 == 1 else ("nd" if index % 10 == 2 else ("rd" if index % 10 == 3 else "th")))} post of {num_posts}'
                 )
                 main(post_id)
-                Popen("cls" if name == "nt" else "clear", shell=True).wait()
+                subprocess.run(["cls" if name == "nt" else "clear"], shell=(name == "nt"))
         elif config["settings"]["times_to_run"]:
             run_many(config["settings"]["times_to_run"])
         else:
@@ -171,14 +171,22 @@ if __name__ == "__main__":
             print_markdown("## Invalid Reddit credentials")
             print_markdown("Please check your credentials in the config.toml file")
             shutdown()
-        # Generic error handling for all other exceptions
-        config["settings"]["tts"]["tiktok_sessionid"] = "REDACTED"
-        config["settings"]["tts"]["elevenlabs_api_key"] = "REDACTED"
-        config["settings"]["tts"]["openai_api_key"] = "REDACTED"
+        # Generic error handling — redact secrets before printing
+        import copy
+        safe_config = copy.deepcopy(config)
+        for key in ("tiktok_sessionid", "elevenlabs_api_key", "openai_api_key",
+                     "client_id", "client_secret", "access_token", "password",
+                     "2fa_secret"):
+            safe_config.setdefault("settings", {}).setdefault("tts", {})[key] = "REDACTED"
+        for section in ("reddit", "threads"):
+            creds = safe_config.get(section, {}).get("creds", {})
+            for cred_key in ("client_id", "client_secret", "password", "access_token", "2fa_secret"):
+                if cred_key in creds:
+                    creds[cred_key] = "REDACTED"
         print_step(
             f"Sorry, something went wrong with this version! Try again, and feel free to report this issue at GitHub or the Discord community.\n"
             f"Version: {__VERSION__} \n"
             f"Error: {err} \n"
-            f'Config: {config["settings"]}'
+            f'Config: {safe_config.get("settings", {})}'
         )
-        raise err
+        raise

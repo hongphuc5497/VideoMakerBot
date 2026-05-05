@@ -1,5 +1,6 @@
 import os
 import subprocess
+import sys
 import zipfile
 
 import requests
@@ -69,8 +70,7 @@ def ffmpeg_install_windows():
 def ffmpeg_install_linux():
     try:
         subprocess.run(
-            "sudo apt install ffmpeg",
-            shell=True,
+            ["sudo", "apt", "install", "-y", "ffmpeg"],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
@@ -87,8 +87,7 @@ def ffmpeg_install_linux():
 def ffmpeg_install_mac():
     try:
         subprocess.run(
-            "brew install ffmpeg",
-            shell=True,
+            ["brew", "install", "ffmpeg"],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
@@ -124,10 +123,10 @@ def ffmpeg_install():
             print("Installing FFmpeg...")
             if os.name == "nt":
                 ffmpeg_install_windows()
+            elif sys.platform == "darwin":
+                ffmpeg_install_mac()
             elif os.name == "posix":
                 ffmpeg_install_linux()
-            elif os.name == "mac":
-                ffmpeg_install_mac()
             else:
                 print("Your OS is not supported. Please install FFmpeg manually and try again.")
                 exit()

@@ -22,6 +22,11 @@ RUN python -m playwright install --with-deps chromium
 
 COPY . .
 
+RUN groupadd -r appuser && useradd -r -g appuser -d /app appuser \
+    && chown -R appuser:appuser /app /ms-playwright
+
 RUN chmod +x /app/docker-entrypoint.sh
+
+USER appuser
 
 ENTRYPOINT ["/bin/sh", "/app/docker-entrypoint.sh"]

@@ -1,5 +1,6 @@
 import os
 import re
+import subprocess
 from pathlib import Path
 from typing import Tuple
 
@@ -115,35 +116,32 @@ class TTSEngine:
         ]
         self.create_silence_mp3()
 
+        # Generate all TTS segment files first
         for idy, text_cut in enumerate(split_text):
             newtext = process_text(text_cut)
-            # print(f"{idx}-{idy}: {newtext}\n")
-
             if not newtext or newtext.isspace():
-                print("newtext was blank because sanitized split text resulted in none")
                 continue
-            else:
-                self.call_tts(f"{idx}-{idy}.part", newtext)
-                with open(f"{self.path}/list.txt", "w") as f:
-                    for idz in range(0, len(split_text)):
-                        f.write("file " + f"'{idx}-{idz}.part.mp3'" + "\n")
-                    split_files.append(str(f"{self.path}/{idx}-{idy}.part.mp3"))
-                    f.write("file " + f"'silence.mp3'" + "\n")
+            self.call_tts(f"{idx}-{idy}.part", newtext)
+            split_files.append(str(f"{self.path}/{idx}-{idy}.part.mp3"))
 
-                os.system(
-                    "ffmpeg -f concat -y -hide_banner -loglevel panic -safe 0 "
-                    + "-i "
-                    + f"{self.path}/list.txt "
-                    + "-c copy "
-                    + f"{self.path}/{idx}.mp3"
-                )
-        try:
-            for i in range(0, len(split_files)):
-                os.unlink(split_files[i])
-        except FileNotFoundError as e:
-            print("File not found: " + e.filename)
-        except OSError:
-            print("OSError")
+        # Write concat list referencing only generated files, then run ffmpeg once
+        list_path = f"{self.path}/list.txt"
+        with open(list_path, "w") as f:
+            for idz in range(len(split_files)):
+                f.write(f"file '{idx}-{idz}.part.mp3'\n")
+            f.write("file 'silence.mp3'\n")
+
+        subprocess.run([
+            "ffmpeg", "-f", "concat", "-y", "-hide_banner", "-loglevel", "panic",
+            "-safe", "0", "-i", list_path, "-c", "copy",
+            f"{self.path}/{idx}.mp3",
+        ], check=False)
+
+        for part_path in split_files:
+            try:
+                os.unlink(part_path)
+            except FileNotFoundError:
+                pass
 
     def call_tts(self, filename: str, text: str):
         try:
@@ -180,7 +178,8 @@ class TTSEngine:
             self.last_clip_length = clip.duration
             self.length += clip.duration
             clip.close()
-        except:
+        except (OSError, IOError, Exception) as e:
+            print_substep(f"Could not probe audio duration: {e}", "yellow")
             self.length = 0
 
     def create_silence_mp3(self):
