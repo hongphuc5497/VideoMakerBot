@@ -178,7 +178,7 @@ def delete_background(key):
 # Add background video
 def add_background(youtube_uri, filename, citation, position):
     # Validate YouTube URI
-    regex = re.compile(r"(?:\/|%3D|v=|vi=)([0-9A-z\-_]{11})(?:[%#?&]|$)").search(youtube_uri)
+    regex = re.compile(r"(?:\/|%3D|v=|vi=)([0-9A-Za-z_-]{11})(?:[%#?&]|$)").search(youtube_uri)
 
     if not regex:
         flash("YouTube URI is invalid!", "error")
