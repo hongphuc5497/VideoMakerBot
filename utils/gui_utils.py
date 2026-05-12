@@ -7,6 +7,22 @@ import tomlkit
 from flask import flash
 
 
+MASKED_SECRET_VALUE = "********"
+SENSITIVE_SETTING_PARTS = {
+    "password",
+    "client_secret",
+    "access_token",
+    "2fa_secret",
+    "tiktok_sessionid",
+    "elevenlabs_api_key",
+    "openai_api_key",
+}
+
+
+def is_sensitive_setting(name: str) -> bool:
+    return any(part in name for part in SENSITIVE_SETTING_PARTS)
+
+
 # Get validation checks from template, keyed by dotted path
 # (e.g. "reddit.creds.username", "threads.creds.username") so that
 # leaf-key collisions across platform sections don't clobber each other.
@@ -113,6 +129,9 @@ def modify_settings(data: dict, config_load, checks: dict):
 
     # Validate and apply values
     for name, raw_value in data.items():
+        if is_sensitive_setting(name) and raw_value == MASKED_SECRET_VALUE:
+            continue
+
         value = check(raw_value, checks[name])
 
         # Value is invalid

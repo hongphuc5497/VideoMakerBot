@@ -70,3 +70,32 @@ def test_add_background(mock_flash, mock_background_json, mock_template_toml):
         assert "test_new" in template_data["settings"]["background"]["background_video"]["options"]
         
         mock_flash.assert_called_with('Added "Rick-test_new.mp4" as a new background video!')
+
+
+@patch("utils.gui_utils.flash")
+def test_modify_settings_preserves_masked_secrets(mock_flash):
+    config_load = {
+        "reddit": {
+            "creds": {
+                "client_secret": "real-secret",
+                "password": "real-password",
+            }
+        }
+    }
+    checks = {
+        "reddit.creds.client_secret": {"optional": False, "type": "str"},
+        "reddit.creds.password": {"optional": False, "type": "str"},
+    }
+
+    result = gui_utils.modify_settings(
+        {
+            "reddit.creds.client_secret": "********",
+            "reddit.creds.password": "changed-password",
+        },
+        config_load,
+        checks,
+    )
+
+    assert config_load["reddit"]["creds"]["client_secret"] == "real-secret"
+    assert config_load["reddit"]["creds"]["password"] == "changed-password"
+    assert result["reddit.creds.client_secret"] == "real-secret"

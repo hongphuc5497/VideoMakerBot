@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import math
+import os
 import subprocess
 import sys
 from os import name
@@ -59,6 +60,12 @@ def _get_platform_post_id(config: dict, platform: str) -> str:
     return ""
 
 
+def clear_screen() -> None:
+    if name != "nt" and not os.environ.get("TERM"):
+        return
+    subprocess.run(["cls" if name == "nt" else "clear"], shell=(name == "nt"))
+
+
 def main(POST_ID=None) -> None:
     global reddit_id, reddit_object
     reddit_object = get_content_object(POST_ID)
@@ -97,7 +104,7 @@ def run_many(times) -> None:
             f'on the {x}{("th", "st", "nd", "rd", "th", "th", "th", "th", "th", "th")[x % 10]} iteration of {times}'
         )
         main()
-        subprocess.run(["cls" if name == "nt" else "clear"], shell=(name == "nt"))
+        clear_screen()
 
 
 def shutdown() -> NoReturn:
@@ -145,7 +152,7 @@ if __name__ == "__main__":
                     f'on the {index}{("st" if index % 10 == 1 else ("nd" if index % 10 == 2 else ("rd" if index % 10 == 3 else "th")))} post of {num_posts}'
                 )
                 main(post_id)
-                subprocess.run(["cls" if name == "nt" else "clear"], shell=(name == "nt"))
+                clear_screen()
         elif config["settings"]["times_to_run"]:
             run_many(config["settings"]["times_to_run"])
         else:

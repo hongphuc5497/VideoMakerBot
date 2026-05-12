@@ -78,10 +78,10 @@ def backgrounds():
 @app.route("/background/add", methods=["POST"])
 def background_add():
     # Get form values
-    youtube_uri = request.form.get("youtube_uri").strip()
-    filename = request.form.get("filename").strip()
-    citation = request.form.get("citation").strip()
-    position = request.form.get("position").strip()
+    youtube_uri = request.form.get("youtube_uri", "").strip()
+    filename = request.form.get("filename", "").strip()
+    citation = request.form.get("citation", "").strip()
+    position = request.form.get("position", "").strip()
 
     gui.add_background(youtube_uri, filename, citation, position)
 

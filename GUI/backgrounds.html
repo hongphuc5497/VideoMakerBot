@@ -108,6 +108,15 @@
     let keys = [];
     let youtube_urls = [];
 
+    function h(str) {
+        return String(str ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+    }
+
     async function loadBackgrounds() {
         try {
             const response = await fetch("backgrounds.json");
@@ -134,8 +143,8 @@
                                     allowfullscreen></iframe>
                         </div>
                         <div class="p-4">
-                            <h3 class="text-slate-200 font-medium truncate mb-1" title="${key}">${key}</h3>
-                            <p class="text-slate-500 text-xs truncate mb-4">${value[2]}</p>
+                            <h3 class="text-slate-200 font-medium truncate mb-1" title="${h(key)}">${h(key)}</h3>
+                            <p class="text-slate-500 text-xs truncate mb-4">${h(value[2])}</p>
                             
                             <div class="flex justify-end">
                                 <button onclick="confirmDelete('${key}')" class="btn btn-square btn-sm btn-ghost hover:bg-red-500/20 hover:text-red-400">
