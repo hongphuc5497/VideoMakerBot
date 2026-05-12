@@ -1,25 +1,25 @@
 {% extends "layout.html" %}
 {% block main %}
 
-<div class="bg-slate-900 min-h-screen py-8">
+<div class="bg-[#F2EFEB] min-h-[calc(100vh-6.5rem)] py-8">
     <div class="container mx-auto px-4">
         <!-- Header & Search -->
-        <div class="flex flex-col md:flex-row justify-between items-center gap-4 mb-8">
-            <h1 class="text-2xl font-bold text-white">Video Library</h1>
+        <div class="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4 mb-8">
+            <h1 class="text-3xl font-display font-black uppercase tracking-tighter text-[#111111]">Video Library</h1>
 
             <!-- Bulk-action bar (visible in select mode only) -->
-            <div id="bulk-bar" class="hidden items-center gap-2">
+            <div id="bulk-bar" class="hidden w-full md:w-auto items-center justify-between md:justify-end gap-2 border border-[#111111] bg-white p-2">
                 <button type="button" onclick="selectAll()"
-                        class="btn btn-ghost text-slate-400 border border-slate-700">
+                        class="btn-ghost-neo h-10">
                     <i data-lucide="check-square" class="w-4 h-4 mr-1"></i>
                     <span id="select-all-label">Select All</span>
                 </button>
                 <button type="button" onclick="cancelSelectMode()"
-                        class="btn btn-ghost text-slate-400">
+                        class="btn-ghost-neo h-10">
                     Cancel
                 </button>
                 <button id="bulk-delete-btn" type="button" onclick="confirmBulkDelete()"
-                        class="btn btn-error" disabled>
+                        class="btn-danger-neo text-sm h-10">
                     <i data-lucide="trash-2" class="w-4 h-4 mr-1"></i>
                     Delete (<span id="selection-count">0</span>)
                 </button>
@@ -28,15 +28,14 @@
             <!-- Normal toolbar (hidden in select mode) -->
             <div id="normal-toolbar" class="flex items-center gap-2 w-full md:w-auto">
                 <button type="button" onclick="toggleSelectMode()"
-                        class="btn btn-ghost text-slate-400 border border-slate-700 shrink-0"
-                        style="height: 3rem; min-height: 3rem;">
+                        class="btn-ghost-neo shrink-0" style="height: 3rem; min-height: 3rem;">
                     <i data-lucide="check-square" class="w-4 h-4 mr-1"></i>
                     Select
                 </button>
                 <div class="relative w-full md:w-72">
-                    <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
+                    <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#111111]/40"></i>
                     <input type="text"
-                           class="searchFilter input input-bordered w-full pl-10 bg-slate-800 border-slate-700 text-slate-200 focus:border-indigo-500"
+                           class="searchFilter input-neo w-full pl-10"
                            style="height: 3rem;"
                            placeholder="Search videos..."
                            onkeyup="searchFilter()">
@@ -50,19 +49,19 @@
         </div>
 
         <!-- Empty State -->
-        <div id="empty-state" class="hidden flex flex-col items-center justify-center py-20 text-slate-500">
-            <i data-lucide="video-off" class="w-16 h-16 mb-4 opacity-20"></i>
-            <p class="text-lg">No videos found</p>
+        <div id="empty-state" class="hidden flex flex-col items-center justify-center py-20 text-[#111111]/30">
+            <i data-lucide="video-off" class="w-16 h-16 mb-4"></i>
+            <p class="text-lg font-mono uppercase tracking-wider">No videos found</p>
         </div>
     </div>
 </div>
 
 <!-- Video Player Modal -->
 <dialog id="player_modal" class="modal modal-bottom sm:modal-middle">
-    <div class="modal-box bg-slate-900 border border-white/10 max-w-2xl p-0 overflow-hidden">
-        <div class="flex justify-between items-center px-4 py-3 border-b border-white/5">
-            <h3 id="player_title" class="font-medium text-slate-200 truncate pr-4"></h3>
-            <button type="button" onclick="closePlayer()" class="btn btn-square btn-sm btn-ghost text-slate-400">
+    <div class="modal-box bg-white border border-[#111111] max-w-2xl p-0 overflow-hidden">
+        <div class="flex justify-between items-center px-4 py-3 border-b border-[#111111]">
+            <h3 id="player_title" class="font-mono text-sm text-[#111111] truncate pr-4 uppercase"></h3>
+            <button type="button" onclick="closePlayer()" class="btn-ghost-neo p-1">
                 <i data-lucide="x" class="w-4 h-4"></i>
             </button>
         </div>
@@ -73,17 +72,17 @@
 
 <!-- Delete Confirmation Modal -->
 <dialog id="delete_modal" class="modal">
-    <div class="modal-box bg-slate-900 border border-white/10">
+    <div class="modal-box bg-white border border-[#111111]">
         <div class="flex items-center gap-3 mb-3">
-            <i data-lucide="triangle-alert" class="w-5 h-5 text-red-400 shrink-0"></i>
-            <h3 class="font-bold text-lg text-white">Delete Video?</h3>
+            <i data-lucide="triangle-alert" class="w-5 h-5 text-[#DE6C56] shrink-0"></i>
+            <h3 class="font-display font-black uppercase tracking-tighter text-lg text-[#111111]">Delete Video?</h3>
         </div>
-        <p id="delete-modal-msg" class="text-slate-400 mb-6 text-sm"></p>
+        <p id="delete-modal-msg" class="text-[#111111]/60 mb-6 text-sm font-mono"></p>
         <div class="modal-action mt-0">
             <form method="dialog">
-                <button class="btn btn-ghost text-slate-400">Cancel</button>
+                <button class="btn-ghost-neo">Cancel</button>
             </form>
-            <button type="button" class="btn btn-error" onclick="executeDelete()">
+            <button type="button" class="btn-danger-neo text-sm" onclick="executeDelete()">
                 <i data-lucide="trash-2" class="w-4 h-4 mr-1"></i>
                 Delete
             </button>
@@ -143,56 +142,55 @@
             data.sort((b, a) => a['time'] - b['time']);
 
             const container = document.getElementById('videos');
-            // Use data-* attributes for arbitrary strings — never embed them in onclick/href
             container.innerHTML = data.map(v => {
                 const title = checkTitle(v.reddit_title, v.filename);
                 return `
-                <div class="video-card group bg-slate-800 rounded-xl overflow-hidden border border-white/5 hover:border-indigo-500/50 transition-all duration-300 hover:shadow-2xl hover:shadow-indigo-500/10 relative"
+                <div class="video-card group bg-white border border-[#111111] relative hover:border-[#DE6C56] transition-colors duration-200 flex flex-col min-h-[23.25rem]"
                      data-video-id="${h(v.id)}">
 
                     <!-- Checkbox overlay (shown in select mode) -->
                     <div class="select-overlay hidden absolute top-3 right-3 z-10 pointer-events-none">
-                        <input type="checkbox" class="card-checkbox checkbox checkbox-primary w-6 h-6 pointer-events-auto" />
+                        <input type="checkbox" class="card-checkbox w-5 h-5 pointer-events-auto accent-[#DE6C56]" />
                     </div>
 
                     <button type="button"
-                            class="play-btn aspect-video w-full bg-slate-900 flex items-center justify-center relative overflow-hidden cursor-pointer"
+                            class="play-btn aspect-video w-full bg-[#111111]/5 flex items-center justify-center relative overflow-hidden cursor-pointer border-b border-[#111111]"
                             data-video-id="${h(v.id)}"
                             data-video-title="${h(title)}">
-                        <i data-lucide="play-circle" class="w-12 h-12 text-slate-700 group-hover:text-indigo-500 transition-colors"></i>
+                        <i data-lucide="play-circle" class="w-12 h-12 text-[#111111]/30 group-hover:text-[#DE6C56] transition-colors"></i>
                         <div class="absolute top-3 left-3">
-                            <span class="badge badge-sm bg-slate-900/80 border-none text-indigo-400 font-medium backdrop-blur-md">
+                            <span class="inline-block bg-white border border-[#111111] text-[#111111] font-mono text-[10px] uppercase tracking-wider px-2 py-0.5">
                                 ${h(categoryLabel(v.subreddit))}
                             </span>
                         </div>
                     </button>
 
-                    <div class="p-4">
-                        <h3 class="text-slate-200 font-medium line-clamp-2 mb-4 h-12" title="${h(title)}">
+                    <div class="p-4 flex flex-col flex-1">
+                        <h3 class="text-[#111111] font-mono text-sm font-medium line-clamp-2 break-words mb-4 min-h-10" title="${h(title)}">
                             ${h(title)}
                         </h3>
 
-                        <div class="flex items-center justify-between gap-2">
+                        <div class="flex items-center justify-between gap-2 mt-auto">
                             <div class="flex gap-1">
                                 <a href="${h(sourceUrl(v.subreddit, v.id))}" target="_blank"
-                                   class="btn btn-square btn-sm btn-ghost hover:bg-indigo-500/20 hover:text-indigo-400"
+                                   class="btn-ghost-neo p-2"
                                    title="View Source">
                                     <i data-lucide="external-link" class="w-4 h-4"></i>
                                 </a>
                                 <a href="/video/${encodeURIComponent(v.id)}?download=1" download
-                                   class="btn btn-square btn-sm btn-ghost hover:bg-indigo-500/20 hover:text-indigo-400"
+                                   class="btn-ghost-neo p-2"
                                    title="Download">
                                     <i data-lucide="download" class="w-4 h-4"></i>
                                 </a>
                             </div>
 
                             <div class="flex gap-1">
-                                <button class="btn btn-square btn-sm btn-ghost hover:bg-slate-700 copy-btn"
+                                <button class="btn-ghost-neo p-2 copy-btn"
                                         data-copy="${h(sourceUrl(v.subreddit, v.id))}"
                                         title="Copy Link">
                                     <i data-lucide="link" class="w-4 h-4"></i>
                                 </button>
-                                <button class="btn btn-square btn-sm btn-ghost hover:bg-red-500/20 hover:text-red-400 delete-btn"
+                                <button class="btn-ghost-neo p-2 hover:text-[#DE6C56] delete-btn"
                                         data-video-id="${h(v.id)}"
                                         title="Delete">
                                     <i data-lucide="trash-2" class="w-4 h-4"></i>
@@ -200,8 +198,8 @@
                             </div>
                         </div>
 
-                        <div class="mt-4 pt-4 border-t border-white/5 flex justify-between items-center">
-                            <span class="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">
+                        <div class="mt-4 pt-4 border-t border-[#111111]/20 flex justify-between items-center">
+                            <span class="text-[10px] uppercase tracking-wider text-[#111111]/40 font-mono">
                                 ${timeSince(v.time)}
                             </span>
                         </div>
@@ -228,7 +226,7 @@
                 btn.addEventListener('click', () => {
                     navigator.clipboard.writeText(btn.dataset.copy).then(() => {
                         const orig = btn.innerHTML;
-                        btn.innerHTML = '<i data-lucide="check" class="w-4 h-4 text-green-500"></i>';
+                        btn.innerHTML = '<i data-lucide="check" class="w-4 h-4 text-[#4ADE80]"></i>';
                         lucide.createIcons();
                         setTimeout(() => { btn.innerHTML = orig; lucide.createIcons(); }, 2000);
                     });
@@ -344,7 +342,7 @@
     }
 
     function searchFilter() {
-        const query = document.querySelector(".searchFilter").value.toLowerCase();
+        const query = document.querySelector(".searchFilter") ? document.querySelector(".searchFilter").value.toLowerCase() : '';
         const cards = document.querySelectorAll(".video-card");
         let visibleCount = 0;
 

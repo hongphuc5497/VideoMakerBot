@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 
 <head>
     <meta charset="utf-8">
@@ -7,70 +7,325 @@
     <meta http-equiv="cache-control" content="no-cache" />
     <title>VideoMakerBot</title>
 
-    <!-- Modern Tech Stack -->
-    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.4.19/dist/full.min.css" rel="stylesheet" type="text/css" />
+    <!-- Tailwind config — must load BEFORE the CDN script -->
+    <script>
+        tailwind = window.tailwind || {};
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        cream: '#F2EFEB',
+                        jet: '#111111',
+                        terracotta: '#DE6C56',
+                        'terracotta-dark': '#C85A46',
+                        terminal: '#4ADE80',
+                    },
+                    fontFamily: {
+                        display: ['"Clash Display"', 'system-ui', 'sans-serif'],
+                        mono: ['"Space Mono"', 'monospace'],
+                    },
+                }
+            }
+        };
+    </script>
     <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- DaisyUI (component library) -->
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.4.19/dist/full.min.css" rel="stylesheet" type="text/css" />
+
+    <!-- Fonts: Clash Display (display/headings via Fontshare) + Space Mono (body/UI via Google Fonts) -->
+    <link rel="preconnect" href="https://api.fontshare.com">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://api.fontshare.com/v2/css?f[]=clash-display@400,500,600,700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+    <!-- Lucide icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
 
     <style>
+        /* ── Neo-Brutalist Global Overrides ───────────────────────────── */
+
+        /* DaisyUI border-radius kill switch */
+        :root {
+            --rounded-box: 0rem;
+            --rounded-btn: 0rem;
+            --rounded-badge: 0rem;
+            --tab-radius: 0rem;
+            --tooltip-radius: 0rem;
+            --alert-radius: 0rem;
+            --input-radius: 0rem;
+        }
+
+        /* Global reset */
         body {
-            font-family: 'Inter', sans-serif;
-            background-color: #0f172a; /* Slate 900 */
+            font-family: 'Space Mono', monospace;
+            background-color: #F2EFEB;
+            color: #111111;
         }
 
-        .glass-nav {
-            background: rgba(15, 23, 42, 0.8);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        /* Kill all box-shadows */
+        *,
+        *::before,
+        *::after {
+            box-shadow: none !important;
         }
 
-        /* Custom scrollbar for a modern look */
-        ::-webkit-scrollbar {
-            width: 8px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #1e293b;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #334155;
-            border-radius: 10px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #475569;
+        /* ── Typography ────────────────────────────────────────────────── */
+
+        h1, h2, h3 {
+            font-family: 'Clash Display', system-ui, sans-serif;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: -0.025em;
         }
 
-        /* Dotted path inputs shouldn't show default browser validation UI */
-        input:invalid {
-            box-shadow: none;
+        /* All UI text: monospace */
+        button, a, input, select, textarea, label, .btn, .badge, nav, footer {
+            font-family: 'Space Mono', monospace !important;
+        }
+
+        /* ── DaisyUI Component Overrides ───────────────────────────────── */
+
+        /* Buttons — kill radius, uppercase */
+        .btn {
+            border-radius: 0 !important;
+            text-transform: uppercase;
+            letter-spacing: 0.025em;
+            font-weight: 500;
+        }
+
+        /* Cards */
+        .card {
+            border-radius: 0 !important;
+        }
+
+        /* Inputs / Selects / Textareas */
+        .input, .select, .textarea {
+            border-radius: 0 !important;
+            border: 1px solid #111111;
+        }
+
+        /* Badges */
+        .badge {
+            border-radius: 0 !important;
+        }
+
+        /* Modals */
+        .modal-box {
+            border-radius: 0 !important;
+        }
+
+        /* Menu items */
+        .menu li > * {
+            border-radius: 0 !important;
+        }
+
+        /* Toggle / Checkbox — kill radius */
+        .toggle {
+            border-radius: 0 !important;
+        }
+
+        /* Alerts */
+        .alert {
+            border-radius: 0 !important;
+        }
+
+        /* Dividers — use /// text pattern where plain dividers appear */
+        .divider:not(.divider-text)::after,
+        .divider:not(.divider-text)::before {
+            /* We'll use .divider-text overrides in templates */
+        }
+
+        /* Progress bar */
+        .progress {
+            border-radius: 0 !important;
+        }
+
+        /* Join groups */
+        .join > * {
+            border-radius: 0 !important;
+        }
+
+        /* ── Custom Scrollbar ──────────────────────────────────────────── */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #F2EFEB; }
+        ::-webkit-scrollbar-thumb { background: #111111; }
+        ::-webkit-scrollbar-thumb:hover { background: #333333; }
+
+        /* Dotted path inputs — suppress default browser validation UI */
+        input:invalid { box-shadow: none; }
+
+        /* ── Navigation ────────────────────────────────────────────────── */
+        .nav-link {
+            font-family: 'Space Mono', monospace;
+            font-size: 0.8125rem;
+            color: #111111;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 0.375rem 0.75rem;
+            transition: background-color 150ms;
+        }
+        .nav-link:hover {
+            background-color: #111111;
+            color: #F2EFEB;
+        }
+
+        /* ── Buttons ───────────────────────────────────────────────────── */
+        .btn-primary-neo {
+            background-color: #DE6C56;
+            color: #F2EFEB;
+            border: 1px solid #DE6C56;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Space Mono', monospace;
+            text-transform: uppercase;
+            font-weight: 500;
+            letter-spacing: 0.025em;
+            padding: 0.5rem 1.25rem;
+            cursor: pointer;
+            transition: all 150ms;
+            border-radius: 0;
+        }
+        .btn-primary-neo:hover {
+            background-color: #111111;
+            border-color: #111111;
+            color: #F2EFEB;
+        }
+
+        .btn-secondary-neo {
+            background-color: transparent;
+            color: #111111;
+            border: 2px solid #111111;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Space Mono', monospace;
+            text-transform: uppercase;
+            font-weight: 500;
+            letter-spacing: 0.025em;
+            padding: 0.5rem 1.25rem;
+            cursor: pointer;
+            transition: all 150ms;
+            border-radius: 0;
+        }
+        .btn-secondary-neo:hover {
+            background-color: #111111;
+            color: #F2EFEB;
+        }
+
+        .btn-ghost-neo {
+            background: transparent;
+            color: #111111;
+            border: 1px solid #111111;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Space Mono', monospace;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            padding: 0.375rem 0.75rem;
+            cursor: pointer;
+            border-radius: 0;
+            transition: all 150ms;
+        }
+        .btn-ghost-neo:hover {
+            background-color: #111111;
+            color: #F2EFEB;
+        }
+
+        .btn-danger-neo {
+            background-color: transparent;
+            color: #DE6C56;
+            border: 1px solid #DE6C56;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Space Mono', monospace;
+            text-transform: uppercase;
+            font-weight: 500;
+            letter-spacing: 0.025em;
+            padding: 0.5rem 1.25rem;
+            cursor: pointer;
+            transition: all 150ms;
+            border-radius: 0;
+        }
+        .btn-danger-neo:hover {
+            background-color: #DE6C56;
+            color: #F2EFEB;
+        }
+        .btn-danger-neo:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+            background-color: transparent;
+            color: #DE6C56;
+        }
+
+        /* ── Cards ─────────────────────────────────────────────────────── */
+        .card-neo {
+            background-color: #FFFFFF;
+            border: 1px solid #111111;
+            border-radius: 0;
+        }
+
+        /* ── Inputs ────────────────────────────────────────────────────── */
+        .input-neo {
+            background-color: #FFFFFF;
+            border: 1px solid #111111;
+            color: #111111;
+            font-family: 'Space Mono', monospace;
+            border-radius: 0;
+            padding: 0.5rem 0.75rem;
+            font-size: 0.8125rem;
+        }
+        .input-neo::placeholder { color: #999999; }
+        .input-neo:focus {
+            outline: none;
+            border-width: 2px;
+        }
+
+        /* ── Footer Ticker ─────────────────────────────────────────────── */
+        .footer-ticker {
+            background-color: #111111;
+            color: #F2EFEB;
+            font-family: 'Space Mono', monospace;
+            font-size: 0.6875rem;
+            letter-spacing: 0.05em;
+            overflow: hidden;
+            white-space: nowrap;
+            padding: 0.625rem 0;
+        }
+        .footer-ticker a {
+            color: #4ADE80;
+            text-decoration: none;
+        }
+        .footer-ticker a:hover {
+            color: #F2EFEB;
+            text-decoration: underline;
         }
     </style>
 </head>
 
-<body class="min-h-screen flex flex-col">
+<body class="min-h-screen flex flex-col bg-[#F2EFEB] text-[#111111]">
 
-    <header class="sticky top-0 z-50 glass-nav">
+    <!-- ── Navigation ─────────────────────────────────────────────────── -->
+    <header class="sticky top-0 z-50 bg-[#F2EFEB] border-b border-[#111111]">
         <div class="container mx-auto px-4">
-            <div class="navbar px-0">
-                <div class="flex-1">
-                    <a href="/" class="flex items-center gap-2 group">
-                        <div class="bg-indigo-600 p-2 rounded-lg group-hover:bg-indigo-500 transition-colors">
-                            <i data-lucide="video" class="w-5 h-5 text-white"></i>
-                        </div>
-                        <span class="text-xl font-bold tracking-tight text-white">VideoMakerBot</span>
-                    </a>
-                </div>
-                <div class="flex-none gap-2">
-                    <ul class="menu menu-horizontal px-1 gap-1">
-                        <li><a href="/" class="rounded-lg hover:bg-white/10 text-slate-300">Library</a></li>
-                        <li><a href="/backgrounds" class="rounded-lg hover:bg-white/10 text-slate-300">Backgrounds</a></li>
-                        <li><a href="/settings" class="rounded-lg hover:bg-white/10 text-slate-300">Settings</a></li>
-                    </ul>
-                    <a href="/create" class="btn btn-indigo btn-sm ml-2 rounded-lg capitalize border-none bg-indigo-600 hover:bg-indigo-500 text-white">
-                        <i data-lucide="plus" class="w-4 h-4"></i>
+            <div class="flex items-center justify-between h-14">
+                <!-- Logo -->
+                <a href="/" class="flex items-center gap-2 no-underline">
+                    <span class="font-display text-lg text-[#111111] tracking-tighter uppercase">VideoMakerBot</span>
+                </a>
+
+                <!-- Nav Items -->
+                <div class="flex items-center gap-0">
+                    <a href="/" class="nav-link">Library</a>
+                    <a href="/backgrounds" class="nav-link">Backgrounds</a>
+                    <a href="/settings" class="nav-link">Settings</a>
+                    <span class="text-[#111111]/20 mx-1">///</span>
+                    <a href="/create" class="btn-primary-neo text-sm py-1.5 px-4">
+                        <i data-lucide="plus" class="w-3.5 h-3.5 inline mr-1"></i>
                         Create
                     </a>
                 </div>
@@ -78,40 +333,38 @@
         </div>
     </header>
 
+    <!-- ── Flash Messages ─────────────────────────────────────────────── -->
     {% if get_flashed_messages() %}
     <div class="container mx-auto px-4 mt-4">
         {% for category, message in get_flashed_messages(with_categories=true) %}
-        <div class="alert {{ 'alert-error' if category == 'error' else 'alert-success' }} shadow-lg mb-2">
-            <i data-lucide="{{ 'alert-circle' if category == 'error' else 'check-circle' }}" class="w-5 h-5"></i>
+        <div class="border px-4 py-3 mb-2 font-mono text-sm
+                    {{ 'border-[#DE6C56] text-[#DE6C56] bg-[#DE6C56]/5' if category == 'error' else 'border-[#4ADE80] text-[#111111] bg-[#4ADE80]/10' }}">
+            <i data-lucide="{{ 'alert-circle' if category == 'error' else 'check-circle' }}" class="w-4 h-4 inline mr-2"></i>
             <span>{{ message }}</span>
         </div>
         {% endfor %}
     </div>
     {% endif %}
 
+    <!-- ── Main Content ───────────────────────────────────────────────── -->
     <main class="flex-grow">
         {% block main %}{% endblock %}
     </main>
 
-    <footer class="bg-slate-900 border-t border-white/5 py-12 mt-12">
-        <div class="container mx-auto px-4">
-            <div class="flex flex-col md:flex-row justify-between items-center gap-6">
-                <div class="flex flex-col gap-2">
-                    <div class="flex items-center gap-2">
-                        <i data-lucide="video" class="w-5 h-5 text-indigo-500"></i>
-                        <span class="text-lg font-semibold text-white">VideoMakerBot</span>
-                    </div>
-                    <p class="text-slate-400 text-sm">Automated short-form video creator.</p>
-                </div>
-
-                <div class="flex gap-6 text-sm text-slate-400">
-                    <a href="https://github.com/elebumm/RedditVideoMakerBot" target="_blank" class="hover:text-white transition-colors">GitHub</a>
-                    <a href="#" class="hover:text-white transition-colors" id="hard-reload">Hard Reload</a>
-                </div>
-            </div>
-            <div class="mt-8 pt-8 border-t border-white/5 text-center text-xs text-slate-500">
-                &copy; 2026 VideoMakerBot. Built for speed and creativity.
-            </div>
+    <!-- ── Footer Ticker ──────────────────────────────────────────────── -->
+    <footer class="footer-ticker border-t-2 border-[#111111]">
+        <div class="container mx-auto px-4 flex items-center gap-3 overflow-x-auto">
+            <span class="text-[#4ADE80] shrink-0">● ONLINE</span>
+            <span class="text-[#F2EFEB]/30 shrink-0">///</span>
+            <span class="shrink-0">VideoMakerBot</span>
+            <span class="text-[#F2EFEB]/30 shrink-0">///</span>
+            <span class="shrink-0">v3.4.0</span>
+            <span class="text-[#F2EFEB]/30 shrink-0">///</span>
+            <a href="https://github.com/elebumm/RedditVideoMakerBot" target="_blank" class="shrink-0">GITHUB</a>
+            <span class="text-[#F2EFEB]/30 shrink-0">///</span>
+            <a href="#" id="hard-reload" class="shrink-0">RELOAD</a>
+            <span class="text-[#F2EFEB]/30 shrink-0">///</span>
+            <span class="text-[#F2EFEB]/50 shrink-0">&copy; 2026</span>
         </div>
     </footer>
 

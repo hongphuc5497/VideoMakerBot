@@ -1,18 +1,18 @@
 {% extends "layout.html" %}
 {% block main %}
 
-<div class="bg-slate-900 min-h-screen py-8">
+<div class="bg-[#F2EFEB] min-h-[calc(100vh-6.5rem)] py-8">
     <div class="container mx-auto px-4 max-w-5xl">
         <div class="flex flex-col md:flex-row justify-between items-end gap-4 mb-8">
             <div>
-                <h1 class="text-3xl font-bold text-white mb-2">Settings</h1>
-                <p class="text-slate-400">Configure your platform credentials and video generation preferences.</p>
+                <h1 class="text-3xl font-display font-black uppercase tracking-tighter text-[#111111] mb-2">Settings</h1>
+                <p class="text-[#111111]/50 font-mono text-sm">Configure platform credentials and video generation preferences.</p>
             </div>
             <div class="flex gap-2">
-                <button id="defaultSettingsBtn" type="button" class="btn btn-outline btn-sm text-slate-400 border-slate-700 hover:bg-slate-800">
+                <button id="defaultSettingsBtn" type="button" class="btn-ghost-neo text-sm">
                     Reset Defaults
                 </button>
-                <button form="settingsForm" type="submit" class="btn btn-indigo btn-sm bg-indigo-600 hover:bg-indigo-500 border-none text-white">
+                <button form="settingsForm" type="submit" class="btn-primary-neo text-sm">
                     Save Changes
                 </button>
             </div>
@@ -23,12 +23,12 @@
 
                 <!-- Navigation Tabs -->
                 <div class="lg:col-span-1">
-                    <ul class="menu bg-slate-800/50 rounded-xl p-2 border border-white/5 sticky top-24" id="settingsTabs">
-                        <li><a class="active flex gap-3 py-3" data-tab="platform"><i data-lucide="layout-template" class="w-4 h-4"></i> Platform</a></li>
-                        <li><a class="flex gap-3 py-3" data-tab="content"><i data-lucide="file-text" class="w-4 h-4"></i> Content</a></li>
-                        <li><a class="flex gap-3 py-3" data-tab="visuals"><i data-lucide="palette" class="w-4 h-4"></i> Visuals</a></li>
-                        <li><a class="flex gap-3 py-3" data-tab="audio"><i data-lucide="volume-2" class="w-4 h-4"></i> Audio</a></li>
-                        <li><a class="flex gap-3 py-3" data-tab="integration"><i data-lucide="share-2" class="w-4 h-4"></i> Integration</a></li>
+                    <ul class="border border-[#111111] bg-white sticky top-24" id="settingsTabs">
+                        <li><a class="flex gap-3 py-3 px-4 font-mono text-sm uppercase tracking-wider text-[#111111] border-b border-[#111111]/20 hover:bg-[#111111]/5 cursor-pointer active" data-tab="platform"><i data-lucide="layout-template" class="w-4 h-4"></i> Platform</a></li>
+                        <li><a class="flex gap-3 py-3 px-4 font-mono text-sm uppercase tracking-wider text-[#111111] border-b border-[#111111]/20 hover:bg-[#111111]/5 cursor-pointer" data-tab="content"><i data-lucide="file-text" class="w-4 h-4"></i> Content</a></li>
+                        <li><a class="flex gap-3 py-3 px-4 font-mono text-sm uppercase tracking-wider text-[#111111] border-b border-[#111111]/20 hover:bg-[#111111]/5 cursor-pointer" data-tab="visuals"><i data-lucide="palette" class="w-4 h-4"></i> Visuals</a></li>
+                        <li><a class="flex gap-3 py-3 px-4 font-mono text-sm uppercase tracking-wider text-[#111111] border-b border-[#111111]/20 hover:bg-[#111111]/5 cursor-pointer" data-tab="audio"><i data-lucide="volume-2" class="w-4 h-4"></i> Audio</a></li>
+                        <li><a class="flex gap-3 py-3 px-4 font-mono text-sm uppercase tracking-wider text-[#111111] hover:bg-[#111111]/5 cursor-pointer" data-tab="integration"><i data-lucide="share-2" class="w-4 h-4"></i> Integration</a></li>
                     </ul>
                 </div>
 
@@ -37,69 +37,69 @@
 
                     <!-- Platform Tab -->
                     <div id="tab-platform" class="tab-pane">
-                        <div class="card bg-slate-800 border border-white/5 shadow-xl">
-                            <div class="card-body">
-                                <h2 class="card-title text-white mb-6">Source Configuration</h2>
+                        <div class="card-neo">
+                            <div class="p-6">
+                                <h2 class="font-display font-black uppercase tracking-tighter text-xl text-[#111111] mb-6">Source Configuration</h2>
 
                                 <div class="form-control w-full mb-8">
-                                    <label class="label"><span class="label-text text-slate-300 font-medium">Content Platform</span></label>
-                                    <select name="settings.platform" id="platformSelect" class="select select-bordered bg-slate-900 border-slate-700 focus:border-indigo-500">
+                                    <label class="label"><span class="label-text text-[#111111] font-mono text-xs uppercase tracking-wider font-medium">Content Platform</span></label>
+                                    <select name="settings.platform" id="platformSelect" class="input-neo w-full bg-white">
                                         <option value="reddit">Reddit</option>
                                         <option value="threads">Threads (Meta)</option>
                                     </select>
-                                    <label class="label"><span class="label-text-alt text-slate-500">Which social media platform to pull content from</span></label>
+                                    <label class="label"><span class="label-text-alt text-[#111111]/40 font-mono text-xs">Which social media platform to pull content from</span></label>
                                 </div>
 
                                 <!-- Reddit Section -->
                                 <div class="platform-section space-y-6" data-platform="reddit">
-                                    <div class="divider text-slate-500 text-xs uppercase tracking-widest">Reddit Credentials</div>
+                                    <div class="font-mono text-xs uppercase tracking-widest text-[#111111]/30 py-2">/// Reddit Credentials</div>
                                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div class="form-control w-full">
-                                            <label class="label"><span class="label-text text-slate-400">Client ID</span></label>
-                                            <input name="reddit.creds.client_id" value="{{ data['reddit.creds.client_id'] }}" type="text" class="input input-bordered bg-slate-900 border-slate-700" placeholder="Your Client ID">
+                                            <label class="label"><span class="label-text text-[#111111]/60 font-mono text-xs">Client ID</span></label>
+                                            <input name="reddit.creds.client_id" value="{{ data['reddit.creds.client_id'] }}" type="text" class="input-neo w-full" placeholder="Your Client ID">
                                         </div>
                                         <div class="form-control w-full">
-                                            <label class="label"><span class="label-text text-slate-400">Client Secret</span></label>
-                                            <input name="reddit.creds.client_secret" value="{{ data['reddit.creds.client_secret'] }}" type="text" class="input input-bordered bg-slate-900 border-slate-700" placeholder="Your Client Secret">
+                                            <label class="label"><span class="label-text text-[#111111]/60 font-mono text-xs">Client Secret</span></label>
+                                            <input name="reddit.creds.client_secret" value="{{ data['reddit.creds.client_secret'] }}" type="text" class="input-neo w-full" placeholder="Your Client Secret">
                                         </div>
                                         <div class="form-control w-full">
-                                            <label class="label"><span class="label-text text-slate-400">Username</span></label>
-                                            <input name="reddit.creds.username" value="{{ data['reddit.creds.username'] }}" type="text" class="input input-bordered bg-slate-900 border-slate-700" placeholder="Reddit Username">
+                                            <label class="label"><span class="label-text text-[#111111]/60 font-mono text-xs">Username</span></label>
+                                            <input name="reddit.creds.username" value="{{ data['reddit.creds.username'] }}" type="text" class="input-neo w-full" placeholder="Reddit Username">
                                         </div>
                                         <div class="form-control w-full">
-                                            <label class="label"><span class="label-text text-slate-400">Password</span></label>
-                                            <input name="reddit.creds.password" value="{{ data['reddit.creds.password'] }}" type="password" class="input input-bordered bg-slate-900 border-slate-700" placeholder="Reddit Password">
+                                            <label class="label"><span class="label-text text-[#111111]/60 font-mono text-xs">Password</span></label>
+                                            <input name="reddit.creds.password" value="{{ data['reddit.creds.password'] }}" type="password" class="input-neo w-full" placeholder="Reddit Password">
                                         </div>
                                     </div>
-                                    <div class="flex items-center gap-4 bg-slate-900/50 p-4 rounded-lg border border-white/5">
-                                        <input name="reddit.creds.2fa" type="checkbox" class="toggle toggle-indigo" value="True">
-                                        <span class="text-sm text-slate-300">Enable 2FA Support</span>
+                                    <div class="flex items-center gap-4 bg-white border border-[#111111] p-4">
+                                        <input name="reddit.creds.2fa" type="checkbox" class="toggle toggle-lg [--tglbg:#F2EFEB] [--toggle-border:#111111] bg-[#111111]/20 hover:bg-[#DE6C56] [&:checked]:bg-[#DE6C56] [&:checked]:border-[#DE6C56]" value="True">
+                                        <span class="text-sm text-[#111111] font-mono">Enable 2FA Support</span>
                                     </div>
                                 </div>
 
                                 <!-- Threads Section -->
                                 <div class="platform-section space-y-6 hidden" data-platform="threads">
-                                    <div class="divider text-slate-500 text-xs uppercase tracking-widest">Threads Configuration</div>
+                                    <div class="font-mono text-xs uppercase tracking-widest text-[#111111]/30 py-2">/// Threads Configuration</div>
                                     <div class="form-control w-full">
-                                        <label class="label"><span class="label-text text-slate-400">Discovery Method</span></label>
-                                        <select name="threads.discovery_method" class="select select-bordered bg-slate-900 border-slate-700">
+                                        <label class="label"><span class="label-text text-[#111111]/60 font-mono text-xs">Discovery Method</span></label>
+                                        <select name="threads.discovery_method" class="input-neo w-full bg-white">
                                             <option value="api">API (Your own posts)</option>
                                             <option value="scrape">Scrape (For You feed)</option>
                                         </select>
                                     </div>
                                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div class="form-control w-full">
-                                            <label class="label"><span class="label-text text-slate-400">Threads Username</span></label>
-                                            <input name="threads.creds.username" value="{{ data['threads.creds.username'] }}" type="text" class="input input-bordered bg-slate-900 border-slate-700" placeholder="Username">
+                                            <label class="label"><span class="label-text text-[#111111]/60 font-mono text-xs">Threads Username</span></label>
+                                            <input name="threads.creds.username" value="{{ data['threads.creds.username'] }}" type="text" class="input-neo w-full" placeholder="Username">
                                         </div>
                                         <div class="form-control w-full">
-                                            <label class="label"><span class="label-text text-slate-400">Threads Password</span></label>
-                                            <input name="threads.creds.password" value="{{ data['threads.creds.password'] }}" type="password" class="input input-bordered bg-slate-900 border-slate-700" placeholder="Password">
+                                            <label class="label"><span class="label-text text-[#111111]/60 font-mono text-xs">Threads Password</span></label>
+                                            <input name="threads.creds.password" value="{{ data['threads.creds.password'] }}" type="password" class="input-neo w-full" placeholder="Password">
                                         </div>
                                     </div>
                                     <div class="form-control w-full">
-                                        <label class="label"><span class="label-text text-slate-400">Access Token</span></label>
-                                        <input name="threads.creds.access_token" value="{{ data['threads.creds.access_token'] }}" type="text" class="input input-bordered bg-slate-900 border-slate-700" placeholder="Long-lived Graph API Token">
+                                        <label class="label"><span class="label-text text-[#111111]/60 font-mono text-xs">Access Token</span></label>
+                                        <input name="threads.creds.access_token" value="{{ data['threads.creds.access_token'] }}" type="text" class="input-neo w-full" placeholder="Long-lived Graph API Token">
                                     </div>
                                 </div>
                             </div>
@@ -108,64 +108,64 @@
 
                     <!-- Content Tab -->
                     <div id="tab-content" class="tab-pane hidden">
-                        <div class="card bg-slate-800 border border-white/5 shadow-xl">
-                            <div class="card-body space-y-6">
-                                <h2 class="card-title text-white mb-2">Content Filtering</h2>
+                        <div class="card-neo">
+                            <div class="p-6 space-y-6">
+                                <h2 class="font-display font-black uppercase tracking-tighter text-xl text-[#111111] mb-2">Content Filtering</h2>
 
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <!-- Reddit Options -->
                                     <div class="platform-section space-y-4" data-platform="reddit">
                                         <div class="form-control w-full">
-                                            <label class="label"><span class="label-text text-slate-400">Target Subreddit</span></label>
-                                            <input name="reddit.thread.subreddit" value="{{ data['reddit.thread.subreddit'] }}" type="text" class="input input-bordered bg-slate-900 border-slate-700">
+                                            <label class="label"><span class="label-text text-[#111111]/60 font-mono text-xs">Target Subreddit</span></label>
+                                            <input name="reddit.thread.subreddit" value="{{ data['reddit.thread.subreddit'] }}" type="text" class="input-neo w-full">
                                         </div>
                                         <div class="form-control">
-                                            <label class="label"><span class="label-text text-slate-400">Max Comment Length: <span class="val-display font-mono text-indigo-400"></span></span></label>
-                                            <input name="reddit.thread.max_comment_length" type="range" min="100" max="1000" step="50" class="range range-xs range-indigo" value="{{ data['reddit.thread.max_comment_length'] }}">
+                                            <label class="label"><span class="label-text text-[#111111]/60 font-mono text-xs">Max Comment Length: <span class="val-display font-mono text-[#DE6C56]"></span></span></label>
+                                            <input name="reddit.thread.max_comment_length" type="range" min="100" max="1000" step="50" class="range range-xs accent-[#DE6C56]" value="{{ data['reddit.thread.max_comment_length'] }}">
                                         </div>
                                         <div class="form-control">
-                                            <label class="label"><span class="label-text text-slate-400">Min Comments: <span class="val-display font-mono text-indigo-400"></span></span></label>
-                                            <input name="reddit.thread.min_comments" type="range" min="1" max="100" step="1" class="range range-xs range-indigo" value="{{ data['reddit.thread.min_comments'] }}">
+                                            <label class="label"><span class="label-text text-[#111111]/60 font-mono text-xs">Min Comments: <span class="val-display font-mono text-[#DE6C56]"></span></span></label>
+                                            <input name="reddit.thread.min_comments" type="range" min="1" max="100" step="1" class="range range-xs accent-[#DE6C56]" value="{{ data['reddit.thread.min_comments'] }}">
                                         </div>
                                         <div class="form-control w-full">
-                                            <label class="label"><span class="label-text text-slate-400">Blocked Words</span></label>
-                                            <input name="reddit.thread.blocked_words" value="{{ data['reddit.thread.blocked_words'] }}" type="text" class="input input-bordered bg-slate-900 border-slate-700" placeholder="nsfw, spoiler, politics">
-                                            <label class="label"><span class="label-text-alt text-slate-500">Comma-separated. Posts and comments matching these words are skipped.</span></label>
+                                            <label class="label"><span class="label-text text-[#111111]/60 font-mono text-xs">Blocked Words</span></label>
+                                            <input name="reddit.thread.blocked_words" value="{{ data['reddit.thread.blocked_words'] }}" type="text" class="input-neo w-full" placeholder="nsfw, spoiler, politics">
+                                            <label class="label"><span class="label-text-alt text-[#111111]/40 font-mono text-xs">Comma-separated. Matching posts and comments are skipped.</span></label>
                                         </div>
                                     </div>
 
                                     <!-- Threads Options -->
                                     <div class="platform-section hidden space-y-4" data-platform="threads">
                                         <div class="form-control w-full">
-                                            <label class="label"><span class="label-text text-slate-400">Search Queries</span></label>
-                                            <input name="threads.thread.search_queries" value="{{ data['threads.thread.search_queries'] }}" type="text" class="input input-bordered bg-slate-900 border-slate-700" placeholder="news,viral,stories">
+                                            <label class="label"><span class="label-text text-[#111111]/60 font-mono text-xs">Search Queries</span></label>
+                                            <input name="threads.thread.search_queries" value="{{ data['threads.thread.search_queries'] }}" type="text" class="input-neo w-full" placeholder="news,viral,stories">
                                         </div>
                                         <div class="form-control w-full">
-                                            <label class="label"><span class="label-text text-slate-400">Max Reply Length: <span class="val-display font-mono text-indigo-400"></span></span></label>
-                                            <input name="threads.thread.max_reply_length" type="range" min="100" max="1000" step="50" class="range range-xs range-indigo" value="{{ data['threads.thread.max_reply_length'] }}">
+                                            <label class="label"><span class="label-text text-[#111111]/60 font-mono text-xs">Max Reply Length: <span class="val-display font-mono text-[#DE6C56]"></span></span></label>
+                                            <input name="threads.thread.max_reply_length" type="range" min="100" max="1000" step="50" class="range range-xs accent-[#DE6C56]" value="{{ data['threads.thread.max_reply_length'] }}">
                                         </div>
                                         <div class="form-control w-full">
-                                            <label class="label"><span class="label-text text-slate-400">Min Replies: <span class="val-display font-mono text-indigo-400"></span></span></label>
-                                            <input name="threads.thread.min_replies" type="range" min="1" max="50" step="1" class="range range-xs range-indigo" value="{{ data['threads.thread.min_replies'] }}">
+                                            <label class="label"><span class="label-text text-[#111111]/60 font-mono text-xs">Min Replies: <span class="val-display font-mono text-[#DE6C56]"></span></span></label>
+                                            <input name="threads.thread.min_replies" type="range" min="1" max="50" step="1" class="range range-xs accent-[#DE6C56]" value="{{ data['threads.thread.min_replies'] }}">
                                         </div>
                                         <div class="form-control w-full">
-                                            <label class="label"><span class="label-text text-slate-400">Blocked Words</span></label>
-                                            <input name="threads.thread.blocked_words" value="{{ data['threads.thread.blocked_words'] }}" type="text" class="input input-bordered bg-slate-900 border-slate-700" placeholder="nsfw, spoiler, politics">
-                                            <label class="label"><span class="label-text-alt text-slate-500">Comma-separated. Posts and replies matching these words are skipped.</span></label>
+                                            <label class="label"><span class="label-text text-[#111111]/60 font-mono text-xs">Blocked Words</span></label>
+                                            <input name="threads.thread.blocked_words" value="{{ data['threads.thread.blocked_words'] }}" type="text" class="input-neo w-full" placeholder="nsfw, spoiler, politics">
+                                            <label class="label"><span class="label-text-alt text-[#111111]/40 font-mono text-xs">Comma-separated. Matching posts and replies are skipped.</span></label>
                                         </div>
                                     </div>
                                 </div>
 
-                                <div class="divider border-white/5">General</div>
+                                <div class="font-mono text-xs uppercase tracking-widest text-[#111111]/30 py-2">/// General</div>
 
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div class="flex items-center gap-4 bg-slate-900/50 p-4 rounded-lg border border-white/5">
-                                        <input name="settings.allow_nsfw" type="checkbox" class="toggle toggle-error" value="True">
-                                        <span class="text-sm text-slate-300">Allow NSFW Content</span>
+                                    <div class="flex items-center gap-4 bg-white border border-[#111111] p-4">
+                                        <input name="settings.allow_nsfw" type="checkbox" class="toggle toggle-lg [--tglbg:#F2EFEB] [--toggle-border:#111111] bg-[#111111]/20 hover:bg-[#DE6C56] [&:checked]:bg-[#DE6C56] [&:checked]:border-[#DE6C56]" value="True">
+                                        <span class="text-sm text-[#111111] font-mono">Allow NSFW Content</span>
                                     </div>
                                     <div class="form-control w-full">
-                                        <label class="label"><span class="label-text text-slate-400 font-medium">Videos to generate: <span class="val-display font-mono text-indigo-400"></span></span></label>
-                                        <input name="settings.times_to_run" type="range" min="1" max="50" step="1" class="range range-xs range-indigo" value="{{ data['settings.times_to_run'] }}">
+                                        <label class="label"><span class="label-text text-[#111111] font-mono text-xs font-medium">Videos to generate: <span class="val-display font-mono text-[#DE6C56]"></span></span></label>
+                                        <input name="settings.times_to_run" type="range" min="1" max="50" step="1" class="range range-xs accent-[#DE6C56]" value="{{ data['settings.times_to_run'] }}">
                                     </div>
                                 </div>
                             </div>
@@ -174,40 +174,40 @@
 
                     <!-- Visuals Tab -->
                     <div id="tab-visuals" class="tab-pane hidden">
-                        <div class="card bg-slate-800 border border-white/5 shadow-xl">
-                            <div class="card-body space-y-6">
-                                <h2 class="card-title text-white">Visual Styling</h2>
+                        <div class="card-neo">
+                            <div class="p-6 space-y-6">
+                                <h2 class="font-display font-black uppercase tracking-tighter text-xl text-[#111111]">Visual Styling</h2>
 
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div class="form-control">
-                                        <label class="label"><span class="label-text text-slate-400">Screenshot Theme</span></label>
-                                        <select name="settings.theme" class="select select-bordered bg-slate-900 border-slate-700">
+                                        <label class="label"><span class="label-text text-[#111111]/60 font-mono text-xs">Screenshot Theme</span></label>
+                                        <select name="settings.theme" class="input-neo w-full bg-white">
                                             <option value="dark">Dark</option>
                                             <option value="light">Light</option>
                                             <option value="transparent">Transparent</option>
                                         </select>
                                     </div>
                                     <div class="form-control">
-                                        <label class="label"><span class="label-text text-slate-400">Comment Opacity: <span class="val-display font-mono text-indigo-400"></span></span></label>
-                                        <input name="settings.opacity" type="range" min="0" max="1" step="0.05" class="range range-xs range-indigo" value="{{ data['settings.opacity'] }}">
+                                        <label class="label"><span class="label-text text-[#111111]/60 font-mono text-xs">Comment Opacity: <span class="val-display font-mono text-[#DE6C56]"></span></span></label>
+                                        <input name="settings.opacity" type="range" min="0" max="1" step="0.05" class="range range-xs accent-[#DE6C56]" value="{{ data['settings.opacity'] }}">
                                     </div>
                                 </div>
 
-                                <div class="divider border-white/5">Backgrounds</div>
+                                <div class="font-mono text-xs uppercase tracking-widest text-[#111111]/30 py-2">/// Backgrounds</div>
 
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div class="form-control w-full">
-                                        <label class="label"><span class="label-text text-slate-400 font-medium">Video Background</span></label>
-                                        <select name="settings.background.background_video" class="select select-bordered bg-slate-900 border-slate-700">
+                                        <label class="label"><span class="label-text text-[#111111] font-mono text-xs font-medium">Video Background</span></label>
+                                        <select name="settings.background.background_video" class="input-neo w-full bg-white">
                                             {% for background in checks["settings.background.background_video"]["options"] %}
                                             <option value="{{background}}">{{ background or 'Random' }}</option>
                                             {% endfor %}
                                         </select>
-                                        <label class="label"><a href="/backgrounds" target="_blank" class="label-text-alt text-indigo-400 hover:text-indigo-300">Manage video files →</a></label>
+                                        <label class="label"><a href="/backgrounds" target="_blank" class="label-text-alt text-[#DE6C56] hover:text-[#111111] font-mono text-xs">Manage video files &rarr;</a></label>
                                     </div>
                                     <div class="form-control w-full">
-                                        <label class="label"><span class="label-text text-slate-400 font-medium">Audio Track</span></label>
-                                        <select name="settings.background.background_audio" class="select select-bordered bg-slate-900 border-slate-700">
+                                        <label class="label"><span class="label-text text-[#111111] font-mono text-xs font-medium">Audio Track</span></label>
+                                        <select name="settings.background.background_audio" class="input-neo w-full bg-white">
                                             {% for audio in checks["settings.background.background_audio"]["options"] %}
                                             <option value="{{audio}}">{{ audio or 'None' }}</option>
                                             {% endfor %}
@@ -215,9 +215,9 @@
                                     </div>
                                 </div>
 
-                                <div class="flex items-center gap-4 bg-slate-900/50 p-4 rounded-lg border border-white/5">
-                                    <input name="settings.background.background_thumbnail" type="checkbox" class="toggle toggle-indigo" value="True">
-                                    <span class="text-sm text-slate-300">Generate Thumbnail overlay</span>
+                                <div class="flex items-center gap-4 bg-white border border-[#111111] p-4">
+                                    <input name="settings.background.background_thumbnail" type="checkbox" class="toggle toggle-lg [--tglbg:#F2EFEB] [--toggle-border:#111111] bg-[#111111]/20 hover:bg-[#DE6C56] [&:checked]:bg-[#DE6C56] [&:checked]:border-[#DE6C56]" value="True">
+                                    <span class="text-sm text-[#111111] font-mono">Generate Thumbnail overlay</span>
                                 </div>
                             </div>
                         </div>
@@ -225,13 +225,13 @@
 
                     <!-- Audio Tab -->
                     <div id="tab-audio" class="tab-pane hidden">
-                        <div class="card bg-slate-800 border border-white/5 shadow-xl">
-                            <div class="card-body space-y-6">
-                                <h2 class="card-title text-white">Voice & Speech</h2>
+                        <div class="card-neo">
+                            <div class="p-6 space-y-6">
+                                <h2 class="font-display font-black uppercase tracking-tighter text-xl text-[#111111]">Voice & Speech</h2>
 
                                 <div class="form-control w-full">
-                                    <label class="label"><span class="label-text text-slate-400 font-medium">TTS Provider</span></label>
-                                    <select name="settings.tts.voice_choice" id="voiceChoiceSelect" class="select select-bordered bg-slate-900 border-slate-700">
+                                    <label class="label"><span class="label-text text-[#111111] font-mono text-xs font-medium">TTS Provider</span></label>
+                                    <select name="settings.tts.voice_choice" id="voiceChoiceSelect" class="input-neo w-full bg-white">
                                         <option value="streamlabspolly">Streamlabs Polly (Free)</option>
                                         <option value="tiktok">TikTok</option>
                                         <option value="googletranslate">Google Translate</option>
@@ -244,30 +244,30 @@
 
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div class="form-control">
-                                        <label class="label"><span class="label-text text-slate-400">Silence between comments: <span class="val-display font-mono text-indigo-400"></span>s</span></label>
-                                        <input name="settings.tts.silence_duration" type="range" min="0" max="5" step="0.1" class="range range-xs range-indigo" value="{{ data['settings.tts.silence_duration'] }}">
+                                        <label class="label"><span class="label-text text-[#111111]/60 font-mono text-xs">Silence between comments: <span class="val-display font-mono text-[#DE6C56]"></span>s</span></label>
+                                        <input name="settings.tts.silence_duration" type="range" min="0" max="5" step="0.1" class="range range-xs accent-[#DE6C56]" value="{{ data['settings.tts.silence_duration'] }}">
                                     </div>
                                     <div class="flex flex-col gap-3 justify-center">
                                         <div class="flex items-center gap-4">
-                                            <input name="settings.tts.random_voice" type="checkbox" class="toggle toggle-indigo" value="True">
-                                            <span class="text-sm text-slate-300">Randomize voices</span>
+                                            <input name="settings.tts.random_voice" type="checkbox" class="toggle toggle-lg [--tglbg:#F2EFEB] [--toggle-border:#111111] bg-[#111111]/20 hover:bg-[#DE6C56] [&:checked]:bg-[#DE6C56] [&:checked]:border-[#DE6C56]" value="True">
+                                            <span class="text-sm text-[#111111] font-mono">Randomize voices</span>
                                         </div>
                                         <div class="flex items-center gap-4">
-                                            <input name="settings.tts.no_emojis" type="checkbox" class="toggle toggle-indigo" value="True">
-                                            <span class="text-sm text-slate-300">Strip emojis</span>
+                                            <input name="settings.tts.no_emojis" type="checkbox" class="toggle toggle-lg [--tglbg:#F2EFEB] [--toggle-border:#111111] bg-[#111111]/20 hover:bg-[#DE6C56] [&:checked]:bg-[#DE6C56] [&:checked]:border-[#DE6C56]" value="True">
+                                            <span class="text-sm text-[#111111] font-mono">Strip emojis</span>
                                         </div>
                                     </div>
                                 </div>
 
-                                <div class="divider border-white/5">API Credentials</div>
+                                <div class="font-mono text-xs uppercase tracking-widest text-[#111111]/30 py-2">/// API Credentials</div>
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div class="form-control">
-                                        <label class="label"><span class="label-text text-slate-500">ElevenLabs Key</span></label>
-                                        <input name="settings.tts.elevenlabs_api_key" value="{{ data['settings.tts.elevenlabs_api_key'] }}" type="password" class="input input-bordered input-sm bg-slate-900 border-slate-700">
+                                        <label class="label"><span class="label-text text-[#111111]/50 font-mono text-xs">ElevenLabs Key</span></label>
+                                        <input name="settings.tts.elevenlabs_api_key" value="{{ data['settings.tts.elevenlabs_api_key'] }}" type="password" class="input-neo w-full text-sm">
                                     </div>
                                     <div class="form-control">
-                                        <label class="label"><span class="label-text text-slate-500">OpenAI Key</span></label>
-                                        <input name="settings.tts.openai_api_key" value="{{ data['settings.tts.openai_api_key'] }}" type="password" class="input input-bordered input-sm bg-slate-900 border-slate-700">
+                                        <label class="label"><span class="label-text text-[#111111]/50 font-mono text-xs">OpenAI Key</span></label>
+                                        <input name="settings.tts.openai_api_key" value="{{ data['settings.tts.openai_api_key'] }}" type="password" class="input-neo w-full text-sm">
                                     </div>
                                 </div>
                             </div>
@@ -276,32 +276,32 @@
 
                     <!-- Integration Tab -->
                     <div id="tab-integration" class="tab-pane hidden">
-                        <div class="card bg-slate-800 border border-white/5 shadow-xl">
-                            <div class="card-body space-y-6">
-                                <h2 class="card-title text-white">YouTube Integration</h2>
+                        <div class="card-neo">
+                            <div class="p-6 space-y-6">
+                                <h2 class="font-display font-black uppercase tracking-tighter text-xl text-[#111111]">YouTube Integration</h2>
 
-                                <div class="flex items-center gap-4 bg-slate-900/50 p-4 rounded-lg border border-white/5">
-                                    <input name="youtube.enabled" type="checkbox" class="toggle toggle-success" value="True">
-                                    <span class="text-sm text-slate-300 font-medium">Auto-upload after rendering</span>
+                                <div class="flex items-center gap-4 bg-white border border-[#111111] p-4">
+                                    <input name="youtube.enabled" type="checkbox" class="toggle toggle-lg [--tglbg:#F2EFEB] [--toggle-border:#111111] bg-[#111111]/20 hover:bg-[#4ADE80] [&:checked]:bg-[#4ADE80] [&:checked]:border-[#4ADE80]" value="True">
+                                    <span class="text-sm text-[#111111] font-mono font-medium">Auto-upload after rendering</span>
                                 </div>
 
                                 <div class="form-control w-full">
-                                    <label class="label"><span class="label-text text-slate-400">Client Secret Path</span></label>
-                                    <input name="youtube.client_secret_path" value="{{ data['youtube.client_secret_path'] }}" type="text" class="input input-bordered bg-slate-900 border-slate-700" placeholder="path/to/secret.json">
+                                    <label class="label"><span class="label-text text-[#111111]/60 font-mono text-xs">Client Secret Path</span></label>
+                                    <input name="youtube.client_secret_path" value="{{ data['youtube.client_secret_path'] }}" type="text" class="input-neo w-full" placeholder="path/to/secret.json">
                                 </div>
 
                                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <div class="form-control">
-                                        <label class="label"><span class="label-text text-slate-400">Privacy</span></label>
-                                        <select name="youtube.privacy" class="select select-bordered bg-slate-900 border-slate-700">
+                                        <label class="label"><span class="label-text text-[#111111]/60 font-mono text-xs">Privacy</span></label>
+                                        <select name="youtube.privacy" class="input-neo w-full bg-white">
                                             <option value="public">Public</option>
                                             <option value="private">Private</option>
                                             <option value="unlisted">Unlisted</option>
                                         </select>
                                     </div>
                                     <div class="form-control col-span-2">
-                                        <label class="label"><span class="label-text text-slate-400">Tags (comma-separated)</span></label>
-                                        <input name="youtube.tags" value="{{ data['youtube.tags'] }}" type="text" class="input input-bordered bg-slate-900 border-slate-700" placeholder="shorts, reddit, viral">
+                                        <label class="label"><span class="label-text text-[#111111]/60 font-mono text-xs">Tags (comma-separated)</span></label>
+                                        <input name="youtube.tags" value="{{ data['youtube.tags'] }}" type="text" class="input-neo w-full" placeholder="shorts, reddit, viral">
                                     </div>
                                 </div>
                             </div>
@@ -337,7 +337,6 @@
         });
 
         // ---- Form Initialization -------------------------------------------
-        // Set values for all inputs based on the flattened data object
         form.querySelectorAll('input, select, textarea').forEach(input => {
             const name = input.name;
             if (data[name] !== undefined) {
@@ -348,7 +347,6 @@
                 }
             }
 
-            // Trigger input events for range displays
             if (input.type === 'range') {
                 updateRangeDisplay(input);
                 input.addEventListener('input', () => updateRangeDisplay(input));
@@ -381,11 +379,9 @@
             let value = input.value;
             let isValid = true;
 
-            // Optional/Empty check
             if (value.length === 0) {
                 isValid = !!check.optional;
             } else {
-                // Type specific checks
                 if (check.type === 'int' || check.type === 'float') {
                     const num = parseFloat(value);
                     if (check.nmin !== undefined && num < check.nmin) isValid = false;
@@ -395,7 +391,6 @@
                     if (check.nmax !== undefined && value.length > check.nmax) isValid = false;
                 }
 
-                // Regex check
                 if (isValid && check.regex) {
                     const re = new RegExp(check.regex);
                     if (!re.test(value)) isValid = false;
@@ -420,7 +415,6 @@
             enabledInputs.forEach(input => {
                 if (!validateInput(input)) {
                     formIsValid = false;
-                    // Switch to the tab containing the error
                     const pane = input.closest('.tab-pane');
                     if (pane) {
                         const tabBtn = document.querySelector(`[data-tab="${pane.id.replace('tab-', '')}"]`);
@@ -434,7 +428,6 @@
                 return;
             }
 
-            // Handle un-checked checkboxes (ensure they submit "False")
             form.querySelectorAll('input[type="checkbox"]:not(:disabled)').forEach(cb => {
                 if (!cb.checked) {
                     const hidden = document.createElement('input');
