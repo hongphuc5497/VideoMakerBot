@@ -272,3 +272,5 @@ ruvector.db
 pipeline-ui-*.png
 .codex
 .agents
+.config
+.local
