@@ -15,9 +15,9 @@ from utils import settings
 from utils.console import print_step, print_substep
 from utils.voice import sanitize_text
 
-# TikTok + pyttsx3 imports — used for graceful fallback when TikTok TTS fails
+# TikTok + Google Translate imports — used for graceful fallback when TikTok TTS fails
+from TTS.GTTS import GTTS
 from TTS.TikTok import TikTokTTSException
-from TTS.pyttsx import pyttsx as PyttsxModule
 
 DEFAULT_MAX_LENGTH: int = (
     50  # Video length variable, edit this on your own risk. It should work, but it's not supported
@@ -159,15 +159,14 @@ class TTSEngine:
                 )
         except TikTokTTSException as err:
             print_substep(
-                f"TikTok TTS failed ({err}). Falling back to pyttsx3 for this segment.",
+                f"TikTok TTS failed ({err}). Falling back to Google Translate TTS for this segment.",
                 "bold yellow",
             )
-            settings.config["settings"]["tts"]["voice_choice"] = "pyttsx"
-            self.tts_module = PyttsxModule()
+            settings.config["settings"]["tts"]["voice_choice"] = "googletranslate"
+            self.tts_module = GTTS()
             self.tts_module.run(
                 text,
                 filepath=f"{self.path}/{filename}.mp3",
-                random_voice=settings.config["settings"]["tts"]["random_voice"],
             )
         # try:
         #     self.length += MP3(f"{self.path}/{filename}.mp3").info.length

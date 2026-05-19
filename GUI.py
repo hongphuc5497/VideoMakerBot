@@ -5,6 +5,7 @@ import sys
 import threading
 import time
 import webbrowser
+from copy import deepcopy
 from pathlib import Path
 
 # Used "tomlkit" instead of "toml" because it doesn't change formatting on "dump"
@@ -23,6 +24,7 @@ from flask import (
 
 import utils.gui_utils as gui
 from utils.docker_bootstrap import ensure_runtime_state
+from utils.settings import apply_template_defaults
 
 ensure_runtime_state()
 
@@ -111,7 +113,7 @@ def _redact_secrets(data: dict) -> dict:
 @app.route("/settings", methods=["GET", "POST"])
 def settings():
     config_load = tomlkit.loads(Path("config.toml").read_text())
-    config = gui.get_config(config_load)
+    config = gui.get_config(apply_template_defaults(deepcopy(config_load)))
 
     # Get checks for all values
     checks = gui.get_checks()
@@ -121,7 +123,8 @@ def settings():
         data = request.form.to_dict()
 
         # Change settings
-        config = gui.modify_settings(data, config_load, checks)
+        gui.modify_settings(data, config_load, checks)
+        config = gui.get_config(apply_template_defaults(deepcopy(config_load)))
 
     return render_template("settings.html", file="config.toml", data=_redact_secrets(config), checks=checks)
 
@@ -240,8 +243,8 @@ def _run_pipeline(search_queries=None):
         pipeline_state["scraper_events"] = []
 
     try:
-        # Load config
-        settings.config = toml.load("config.toml")
+        # Load config and merge template defaults for non-interactive GUI runs.
+        settings.config = settings.apply_template_defaults(toml.load("config.toml"))
 
         # Apply search_queries override if provided from UI
         if search_queries:
@@ -272,10 +275,14 @@ def _run_pipeline(search_queries=None):
         import importlib
         import video_creation.final_video
         import video_creation.background
+        import video_creation.voices
+        import TTS.engine_wrapper
         import platforms.threads.screenshot
         import main
         importlib.reload(video_creation.final_video)
         importlib.reload(video_creation.background)
+        importlib.reload(TTS.engine_wrapper)
+        importlib.reload(video_creation.voices)
         importlib.reload(platforms.threads.screenshot)
         importlib.reload(main)
 

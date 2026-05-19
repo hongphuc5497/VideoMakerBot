@@ -11,6 +11,8 @@ services:
       GUI_PORT: "4000"
       GUI_OPEN_BROWSER: "0"
       GUI_BROWSER_URL: "http://localhost:4000"
+      XDG_CACHE_HOME: "/app/.cache"
+      CLOAKBROWSER_CACHE_DIR: "/app/.cache/cloakbrowser"
     volumes:
       - ./:/app
     shm_size: "1gb"
@@ -22,6 +24,8 @@ services:
     command: ["python", "main.py"]
     environment:
       PYTHONUNBUFFERED: "1"
+      XDG_CACHE_HOME: "/app/.cache"
+      CLOAKBROWSER_CACHE_DIR: "/app/.cache/cloakbrowser"
     volumes:
       - ./:/app
     shm_size: "1gb"
@@ -34,6 +38,8 @@ services:
     environment:
       PYTHONUNBUFFERED: "1"
       PYTHONPATH: "/app"
+      XDG_CACHE_HOME: "/app/.cache"
+      CLOAKBROWSER_CACHE_DIR: "/app/.cache/cloakbrowser"
     volumes:
       - ./:/app
     shm_size: "1gb"

@@ -82,25 +82,36 @@
                                     <div class="font-mono text-xs uppercase tracking-widest text-[#111111]/30 py-2">/// Threads Configuration</div>
                                     <div class="form-control w-full">
                                         <label class="label"><span class="label-text text-[#111111]/60 font-mono text-xs">Discovery Method</span></label>
-                                        <select name="threads.discovery_method" class="input-neo w-full bg-white">
+                                        <select name="threads.discovery_method" id="threadsDiscoveryMethodSelect" class="input-neo w-full bg-white">
                                             <option value="api">API (Your own posts)</option>
                                             <option value="scrape">Scrape (For You feed)</option>
                                         </select>
                                     </div>
-                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div class="font-mono text-xs uppercase tracking-widest text-[#111111]/30 py-2 threads-discovery-section hidden" data-discovery-methods="scrape" data-preserve-hidden="true">/// Threads Login</div>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 threads-discovery-section hidden" data-discovery-methods="scrape" data-preserve-hidden="true">
                                         <div class="form-control w-full">
                                             <label class="label"><span class="label-text text-[#111111]/60 font-mono text-xs">Threads Username</span></label>
-                                            <input name="threads.creds.username" value="{{ data['threads.creds.username'] }}" type="text" class="input-neo w-full" placeholder="Username">
+                                            <input name="threads.creds.username" value="{{ data.get('threads.creds.username', '') }}" type="text" class="input-neo w-full" placeholder="Username">
                                         </div>
                                         <div class="form-control w-full">
                                             <label class="label"><span class="label-text text-[#111111]/60 font-mono text-xs">Threads Password</span></label>
-                                            <input name="threads.creds.password" value="{{ data['threads.creds.password'] }}" type="password" class="input-neo w-full" placeholder="Password">
+                                            <input name="threads.creds.password" value="{{ data.get('threads.creds.password', '') }}" type="password" class="input-neo w-full" placeholder="Password">
                                         </div>
                                     </div>
-                                    <div class="form-control w-full">
-                                        <label class="label"><span class="label-text text-[#111111]/60 font-mono text-xs">Access Token</span></label>
-                                        <input name="threads.creds.access_token" value="{{ data['threads.creds.access_token'] }}" type="text" class="input-neo w-full" placeholder="Long-lived Graph API Token">
+                                    <div class="font-mono text-xs uppercase tracking-widest text-[#111111]/30 py-2 threads-discovery-section hidden" data-discovery-methods="api">/// Threads API Credentials</div>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div class="form-control w-full threads-discovery-section hidden" data-discovery-methods="api">
+                                            <label class="label"><span class="label-text text-[#111111]/60 font-mono text-xs">Access Token</span></label>
+                                            <input name="threads.creds.access_token" value="{{ data.get('threads.creds.access_token', '') }}" type="text" class="input-neo w-full" placeholder="Long-lived Graph API Token">
+                                        </div>
+                                        <div class="form-control w-full threads-discovery-section hidden" data-discovery-methods="api">
+                                            <label class="label"><span class="label-text text-[#111111]/60 font-mono text-xs">Threads User ID</span></label>
+                                            <input name="threads.creds.user_id" value="{{ data.get('threads.creds.user_id', '') }}" type="text" class="input-neo w-full" placeholder="12345678901234567">
+                                        </div>
                                     </div>
+                                    <p class="text-[#111111]/50 font-mono text-xs leading-relaxed threads-discovery-section hidden" data-discovery-methods="api">
+                                        Screenshots still reuse your saved Threads username/password. Switch to Scrape if you need to edit those login credentials.
+                                    </p>
                                 </div>
                             </div>
                         </div>
@@ -232,13 +243,9 @@
                                 <div class="form-control w-full">
                                     <label class="label"><span class="label-text text-[#111111] font-mono text-xs font-medium">TTS Provider</span></label>
                                     <select name="settings.tts.voice_choice" id="voiceChoiceSelect" class="input-neo w-full bg-white">
-                                        <option value="streamlabspolly">Streamlabs Polly (Free)</option>
-                                        <option value="tiktok">TikTok</option>
-                                        <option value="googletranslate">Google Translate</option>
-                                        <option value="awspolly">AWS Polly</option>
-                                        <option value="elevenlabs">ElevenLabs</option>
-                                        <option value="OpenAI">OpenAI</option>
-                                        <option value="pyttsx">System Voice (pyttsx)</option>
+                                        {% for provider in checks["settings.tts.voice_choice"]["options"] %}
+                                        <option value="{{ provider }}">{% if provider == "streamlabspolly" %}Streamlabs Polly (Free){% elif provider == "googletranslate" %}Google Translate{% elif provider == "awspolly" %}AWS Polly{% elif provider == "pyttsx" %}System Voice (pyttsx){% else %}{{ provider }}{% endif %}</option>
+                                        {% endfor %}
                                     </select>
                                 </div>
 
@@ -259,15 +266,95 @@
                                     </div>
                                 </div>
 
-                                <div class="font-mono text-xs uppercase tracking-widest text-[#111111]/30 py-2">/// API Credentials</div>
+                                <div class="font-mono text-xs uppercase tracking-widest text-[#111111]/30 py-2 tts-provider-section hidden" data-tts-providers="elevenlabs,OpenAI,tiktok">/// API Credentials</div>
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div class="form-control">
+                                    <div class="form-control tts-provider-section hidden" data-tts-providers="elevenlabs">
                                         <label class="label"><span class="label-text text-[#111111]/50 font-mono text-xs">ElevenLabs Key</span></label>
-                                        <input name="settings.tts.elevenlabs_api_key" value="{{ data['settings.tts.elevenlabs_api_key'] }}" type="password" class="input-neo w-full text-sm">
+                                        <input name="settings.tts.elevenlabs_api_key" value="{{ data.get('settings.tts.elevenlabs_api_key', '') }}" type="password" class="input-neo w-full text-sm">
                                     </div>
-                                    <div class="form-control">
+                                    <div class="form-control tts-provider-section hidden" data-tts-providers="OpenAI">
                                         <label class="label"><span class="label-text text-[#111111]/50 font-mono text-xs">OpenAI Key</span></label>
-                                        <input name="settings.tts.openai_api_key" value="{{ data['settings.tts.openai_api_key'] }}" type="password" class="input-neo w-full text-sm">
+                                        <input name="settings.tts.openai_api_key" value="{{ data.get('settings.tts.openai_api_key', '') }}" type="password" class="input-neo w-full text-sm">
+                                    </div>
+                                    <div class="form-control tts-provider-section hidden" data-tts-providers="OpenAI">
+                                        <label class="label"><span class="label-text text-[#111111]/50 font-mono text-xs">OpenAI API URL</span></label>
+                                        <input name="settings.tts.openai_api_url" value="{{ data.get('settings.tts.openai_api_url', '') }}" type="text" class="input-neo w-full text-sm">
+                                    </div>
+                                    <div class="form-control tts-provider-section hidden md:col-span-2" data-tts-providers="tiktok">
+                                        <label class="label"><span class="label-text text-[#111111]/50 font-mono text-xs">TikTok Session ID</span></label>
+                                        <input name="settings.tts.tiktok_sessionid" value="{{ data.get('settings.tts.tiktok_sessionid', '') }}" type="password" class="input-neo w-full text-sm">
+                                    </div>
+                                </div>
+
+                                <div class="font-mono text-xs uppercase tracking-widest text-[#111111]/30 py-2 tts-provider-section hidden" data-tts-providers="Supertonic,elevenlabs,OpenAI,streamlabspolly,awspolly,tiktok,pyttsx">/// Provider Settings</div>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div class="form-control tts-provider-section hidden" data-tts-providers="Supertonic">
+                                        <label class="label"><span class="label-text text-[#111111]/60 font-mono text-xs">Supertonic Voice</span></label>
+                                        <select name="settings.tts.supertonic_voice" class="input-neo w-full bg-white">
+                                            {% for voice in checks["settings.tts.supertonic_voice"]["options"] %}
+                                            <option value="{{ voice }}">{{ voice }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="form-control tts-provider-section hidden" data-tts-providers="Supertonic">
+                                        <label class="label"><span class="label-text text-[#111111]/60 font-mono text-xs">Language Code</span></label>
+                                        <input name="settings.tts.supertonic_lang" value="{{ data.get('settings.tts.supertonic_lang', '') }}" type="text" class="input-neo w-full text-sm" placeholder="na">
+                                    </div>
+                                    <div class="form-control tts-provider-section hidden" data-tts-providers="Supertonic">
+                                        <label class="label"><span class="label-text text-[#111111]/60 font-mono text-xs">Quality Steps: <span class="val-display font-mono text-[#DE6C56]"></span></span></label>
+                                        <input name="settings.tts.supertonic_steps" type="range" min="5" max="12" step="1" class="range range-xs accent-[#DE6C56]" value="{{ data.get('settings.tts.supertonic_steps', 8) }}">
+                                    </div>
+                                    <div class="form-control tts-provider-section hidden" data-tts-providers="Supertonic">
+                                        <label class="label"><span class="label-text text-[#111111]/60 font-mono text-xs">Playback Speed: <span class="val-display font-mono text-[#DE6C56]"></span></span></label>
+                                        <input name="settings.tts.supertonic_speed" type="range" min="0.7" max="2" step="0.05" class="range range-xs accent-[#DE6C56]" value="{{ data.get('settings.tts.supertonic_speed', 1.05) }}">
+                                    </div>
+                                    <div class="form-control tts-provider-section hidden md:col-span-2" data-tts-providers="Supertonic">
+                                        <label class="label"><span class="label-text text-[#111111]/60 font-mono text-xs">Custom Voice JSON Path</span></label>
+                                        <input name="settings.tts.supertonic_custom_voice_path" value="{{ data.get('settings.tts.supertonic_custom_voice_path', '') }}" type="text" class="input-neo w-full text-sm" placeholder="/app/voices/my-voice.json">
+                                    </div>
+                                    <div class="form-control tts-provider-section hidden" data-tts-providers="elevenlabs">
+                                        <label class="label"><span class="label-text text-[#111111]/60 font-mono text-xs">ElevenLabs Voice</span></label>
+                                        <select name="settings.tts.elevenlabs_voice_name" class="input-neo w-full bg-white">
+                                            {% for voice in checks["settings.tts.elevenlabs_voice_name"]["options"] %}
+                                            <option value="{{ voice }}">{{ voice }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="form-control tts-provider-section hidden" data-tts-providers="OpenAI">
+                                        <label class="label"><span class="label-text text-[#111111]/60 font-mono text-xs">OpenAI Voice</span></label>
+                                        <select name="settings.tts.openai_voice_name" class="input-neo w-full bg-white">
+                                            {% for voice in checks["settings.tts.openai_voice_name"]["options"] %}
+                                            <option value="{{ voice }}">{{ voice }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="form-control tts-provider-section hidden" data-tts-providers="OpenAI">
+                                        <label class="label"><span class="label-text text-[#111111]/60 font-mono text-xs">OpenAI Model</span></label>
+                                        <select name="settings.tts.openai_model" class="input-neo w-full bg-white">
+                                            {% for model in checks["settings.tts.openai_model"]["options"] %}
+                                            <option value="{{ model }}">{{ model }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="form-control tts-provider-section hidden" data-tts-providers="streamlabspolly">
+                                        <label class="label"><span class="label-text text-[#111111]/60 font-mono text-xs">Streamlabs Voice</span></label>
+                                        <input name="settings.tts.streamlabs_polly_voice" value="{{ data.get('settings.tts.streamlabs_polly_voice', '') }}" type="text" class="input-neo w-full text-sm">
+                                    </div>
+                                    <div class="form-control tts-provider-section hidden" data-tts-providers="awspolly">
+                                        <label class="label"><span class="label-text text-[#111111]/60 font-mono text-xs">AWS Polly Voice</span></label>
+                                        <input name="settings.tts.aws_polly_voice" value="{{ data.get('settings.tts.aws_polly_voice', '') }}" type="text" class="input-neo w-full text-sm">
+                                    </div>
+                                    <div class="form-control tts-provider-section hidden" data-tts-providers="tiktok">
+                                        <label class="label"><span class="label-text text-[#111111]/60 font-mono text-xs">TikTok Voice</span></label>
+                                        <input name="settings.tts.tiktok_voice" value="{{ data.get('settings.tts.tiktok_voice', '') }}" type="text" class="input-neo w-full text-sm">
+                                    </div>
+                                    <div class="form-control tts-provider-section hidden" data-tts-providers="pyttsx">
+                                        <label class="label"><span class="label-text text-[#111111]/60 font-mono text-xs">System Voice Index</span></label>
+                                        <input name="settings.tts.python_voice" value="{{ data.get('settings.tts.python_voice', '') }}" type="text" class="input-neo w-full text-sm">
+                                    </div>
+                                    <div class="form-control tts-provider-section hidden" data-tts-providers="pyttsx">
+                                        <label class="label"><span class="label-text text-[#111111]/60 font-mono text-xs">Installed Voice Count</span></label>
+                                        <input name="settings.tts.py_voice_num" value="{{ data.get('settings.tts.py_voice_num', '') }}" type="text" class="input-neo w-full text-sm">
                                     </div>
                                 </div>
                             </div>
@@ -345,6 +432,12 @@
                 } else {
                     input.value = data[name];
                 }
+            } else if (validateChecks[name] && validateChecks[name].default !== undefined) {
+                if (input.type === 'checkbox') {
+                    input.checked = (validateChecks[name].default === "True" || validateChecks[name].default === true);
+                } else {
+                    input.value = validateChecks[name].default;
+                }
             }
 
             if (input.type === 'range') {
@@ -360,6 +453,8 @@
 
         // ---- Platform Visibility -------------------------------------------
         const platformSelect = document.getElementById('platformSelect');
+        const threadsDiscoveryMethodSelect = document.getElementById('threadsDiscoveryMethodSelect');
+
         function applyPlatformVisibility() {
             const current = platformSelect.value || "reddit";
             document.querySelectorAll('.platform-section').forEach(section => {
@@ -368,8 +463,58 @@
                 section.querySelectorAll('input, select, textarea').forEach(el => el.disabled = !matches);
             });
         }
+
+        function matchesDiscoveryMethod(section, method) {
+            return (section.dataset.discoveryMethods || '')
+                .split(',')
+                .map(value => value.trim().toLowerCase())
+                .filter(Boolean)
+                .includes((method || '').trim().toLowerCase());
+        }
+
+        function applyThreadsDiscoveryVisibility() {
+            const isThreads = (platformSelect.value || 'reddit') === 'threads';
+            const current = threadsDiscoveryMethodSelect?.value || 'api';
+            document.querySelectorAll('.threads-discovery-section').forEach(section => {
+                const matches = isThreads && matchesDiscoveryMethod(section, current);
+                const preserveHidden = section.dataset.preserveHidden === 'true';
+                section.classList.toggle('hidden', !matches);
+                section.querySelectorAll('input, select, textarea').forEach(el => {
+                    el.disabled = !isThreads || (!matches && !preserveHidden);
+                });
+            });
+        }
+
         platformSelect.addEventListener('change', applyPlatformVisibility);
+        platformSelect.addEventListener('change', applyThreadsDiscoveryVisibility);
+        threadsDiscoveryMethodSelect?.addEventListener('change', applyThreadsDiscoveryVisibility);
         applyPlatformVisibility();
+        applyThreadsDiscoveryVisibility();
+
+        // ---- TTS Provider Visibility ---------------------------------------
+        const voiceChoiceSelect = document.getElementById('voiceChoiceSelect');
+
+        function matchesTtsProvider(section, provider) {
+            return (section.dataset.ttsProviders || '')
+                .split(',')
+                .map(value => value.trim().toLowerCase())
+                .filter(Boolean)
+                .includes((provider || '').trim().toLowerCase());
+        }
+
+        function applyTtsVisibility() {
+            const current = voiceChoiceSelect.value || 'Supertonic';
+            document.querySelectorAll('.tts-provider-section').forEach(section => {
+                const matches = matchesTtsProvider(section, current);
+                section.classList.toggle('hidden', !matches);
+                section.querySelectorAll('input, select, textarea').forEach(el => {
+                    el.disabled = !matches;
+                });
+            });
+        }
+
+        voiceChoiceSelect.addEventListener('change', applyTtsVisibility);
+        applyTtsVisibility();
 
         // ---- Validation ----------------------------------------------------
         function validateInput(input) {
@@ -455,6 +600,10 @@
                     validateInput(input);
                 }
             });
+
+            applyPlatformVisibility();
+            applyThreadsDiscoveryVisibility();
+            applyTtsVisibility();
         });
 
         lucide.createIcons();

@@ -52,6 +52,7 @@ def ensure_runtime_state() -> None:
         "assets/temp",
         "assets/backgrounds/audio",
         "assets/backgrounds/video",
+        ".cache",
         "results",
         "video_creation/data",
     ):

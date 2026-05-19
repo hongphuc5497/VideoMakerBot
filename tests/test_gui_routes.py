@@ -1,4 +1,4 @@
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from GUI import app
 
@@ -28,3 +28,18 @@ def test_background_add_passes_empty_defaults_for_missing_optional_fields():
         "",
         "",
     )
+
+
+def test_settings_get_uses_template_defaults_for_partial_config():
+    app.testing = True
+    fake_path = MagicMock()
+    fake_path.read_text.return_value = ""
+
+    with patch("GUI.Path", MagicMock(return_value=fake_path)):
+        response = app.test_client().get("/settings")
+
+    body = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert '"settings.tts.voice_choice": "Supertonic"' in body
+    assert 'name="settings.tts.supertonic_voice"' in body

@@ -99,3 +99,33 @@ def test_modify_settings_preserves_masked_secrets(mock_flash):
     assert config_load["reddit"]["creds"]["client_secret"] == "real-secret"
     assert config_load["reddit"]["creds"]["password"] == "changed-password"
     assert result["reddit.creds.client_secret"] == "real-secret"
+
+
+@patch("utils.gui_utils.flash")
+def test_modify_settings_does_not_materialize_missing_default_values(mock_flash, tmp_path):
+    config_load = {"settings": {"channel_name": "My Channel"}}
+    checks = {
+        "settings.channel_name": {"optional": True, "type": "str"},
+        "settings.tts.voice_choice": {"optional": False, "type": "str", "default": "Supertonic"},
+        "settings.tts.supertonic_voice": {"optional": True, "type": "str", "default": "M1"},
+        "threads.creds.username": {"optional": True, "type": "str"},
+    }
+    config_path = tmp_path / "config.toml"
+
+    with patch("utils.gui_utils.Path", MagicMock(return_value=config_path)):
+        result = gui_utils.modify_settings(
+            {
+                "settings.channel_name": "Updated Channel",
+                "settings.tts.voice_choice": "Supertonic",
+                "settings.tts.supertonic_voice": "M1",
+                "threads.creds.username": "",
+            },
+            config_load,
+            checks,
+        )
+
+    assert config_load["settings"]["channel_name"] == "Updated Channel"
+    assert "tts" not in config_load["settings"]
+    assert "threads" not in config_load
+    assert "settings.tts.voice_choice" not in result
+    assert "threads.creds.username" not in result

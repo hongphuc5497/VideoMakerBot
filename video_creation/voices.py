@@ -9,6 +9,7 @@ from TTS.GTTS import GTTS
 from TTS.openai_tts import OpenAITTS
 from TTS.pyttsx import pyttsx
 from TTS.streamlabs_polly import StreamlabsPolly
+from TTS.supertonic_tts import SupertonicTTS
 from TTS.TikTok import TikTok
 from utils import settings
 from utils.console import print_step, print_table
@@ -23,6 +24,7 @@ TTSProviders = {
     "pyttsx": pyttsx,
     "ElevenLabs": elevenlabs,
     "OpenAI": OpenAITTS,
+    "Supertonic": SupertonicTTS,
 }
 
 

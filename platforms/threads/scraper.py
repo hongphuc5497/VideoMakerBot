@@ -8,10 +8,11 @@ Returns the standard content_object dict consumed by the rest of the pipeline.
 import re
 from typing import Optional
 
-from playwright.sync_api import BrowserContext, Locator, sync_playwright
+from playwright.sync_api import BrowserContext, Locator
 
 from platforms.threads.auth import ensure_authenticated_context
 from utils import settings
+from utils.browser_backend import launch_browser
 from utils.console import emit_scraper_event, print_step, print_substep
 from utils.voice import sanitize_text
 from utils.videos import check_done_by_id
@@ -526,108 +527,103 @@ def get_trending_threads_content(POST_ID: Optional[str] = None) -> dict:
     min_replies = int(settings.config["threads"]["thread"]["min_replies"])
     min_engagement = int(settings.config["threads"]["thread"].get("min_engagement", 0))
 
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        try:
-            context = ensure_authenticated_context(browser)
+    with launch_browser(headless=True) as browser:
+        context = ensure_authenticated_context(browser)
 
-            if POST_ID:
-                post_url = f"https://www.threads.net/t/{POST_ID}"
-                post = {"url": post_url, "post_id": POST_ID, "text": "", "body": ""}
-                replies = _scrape_post_replies(context, post_url)
-                content = _build_content_object(post, replies)
-                if content["comments"] or content.get("thread_post"):
-                    return content
-                raise RuntimeError(
-                    f"No replies found for post {POST_ID}. "
-                    f"Minimum required: {min_replies}."
-                )
-
-            # Scrape from multiple sources: main feed + trending search queries
-            posts = _scrape_feed_posts(context)
-            # Also search for popular topics to find high-engagement content
-            trending_queries = settings.config["threads"]["thread"].get(
-                "search_queries", "news,politics,trending"
-            )
-            for query in trending_queries.split(","):
-                query = query.strip()
-                if query:
-                    try:
-                        search_posts = _scrape_search_page(context, query)
-                        # Merge avoiding duplicates
-                        existing_ids = {p["post_id"] for p in posts}
-                        for sp in search_posts:
-                            if sp["post_id"] not in existing_ids:
-                                posts.append(sp)
-                    except Exception as e:
-                        print_substep(f"Search query failed: {e}", "yellow")
-
-            if not posts:
-                raise RuntimeError("No posts found in feed. Try again later.")
-
-            candidates = _filter_candidates(posts)
-            if not candidates:
-                raise RuntimeError(
-                    f"No eligible posts in feed after filtering. "
-                    f"Try lowering min_engagement (currently {min_engagement:,}) "
-                    f"or min_replies (currently {min_replies})."
-                )
-
-            for i, candidate in enumerate(candidates):
-                eng = candidate.get("_total_engagement", 0)
-                print_substep(
-                    f"Trying #{i + 1}: ♥{candidate['likes']:,} "
-                    f"💬{candidate['replies_shown']} "
-                    f"'{candidate['body'][:60]}...'",
-                    style="dim",
-                )
-                emit_scraper_event("visiting_post", {
-                    "post_id": candidate["post_id"],
-                    "url": candidate["url"],
-                    "engagement": eng,
-                    "likes": candidate.get("likes", 0),
-                    "body": candidate.get("body", "")[:60],
-                    "attempt": i + 1,
-                })
-                try:
-                    replies = _scrape_post_replies(context, candidate["url"])
-                    emit_scraper_event("replies_found", {
-                        "post_id": candidate["post_id"],
-                        "count": len(replies),
-                        "min_required": min_replies,
-                    })
-                    if len(replies) >= min_replies:
-                        if not candidate.get("body") or len(candidate.get("body", "")) < 50:
-                            full_text = _scrape_main_post_text(context, candidate["url"])
-                            if full_text:
-                                candidate["body"] = full_text
-                        content = _build_content_object(candidate, replies)
-                        title_preview = content["thread_title"][:60]
-                        print_substep(
-                            f"Selected: '{title_preview}...' "
-                            f"♥{candidate['likes']:,} 💬{len(content['comments'])} replies",
-                            style="bold green",
-                        )
-                        emit_scraper_event("post_selected", {
-                            "title": content["thread_title"][:80],
-                            "post_id": candidate["post_id"],
-                            "likes": candidate["likes"],
-                            "replies_count": len(content["comments"]),
-                            "url": candidate["url"],
-                        })
-                        return content
-                    print_substep(
-                        f"  Only {len(replies)} replies (need {min_replies}). Trying next...",
-                        style="yellow",
-                    )
-                except Exception as e:
-                    print_substep(f"  Failed: {e}. Trying next...", style="yellow")
-                    continue
-
+        if POST_ID:
+            post_url = f"https://www.threads.net/t/{POST_ID}"
+            post = {"url": post_url, "post_id": POST_ID, "text": "", "body": ""}
+            replies = _scrape_post_replies(context, post_url)
+            content = _build_content_object(post, replies)
+            if content["comments"] or content.get("thread_post"):
+                return content
             raise RuntimeError(
-                f"No eligible posts with {min_replies}+ replies found "
-                f"after trying {len(candidates)} candidates."
+                f"No replies found for post {POST_ID}. "
+                f"Minimum required: {min_replies}."
             )
 
-        finally:
-            browser.close()
+        # Scrape from multiple sources: main feed + trending search queries
+        posts = _scrape_feed_posts(context)
+        # Also search for popular topics to find high-engagement content
+        trending_queries = settings.config["threads"]["thread"].get(
+            "search_queries", "news,politics,trending"
+        )
+        for query in trending_queries.split(","):
+            query = query.strip()
+            if query:
+                try:
+                    search_posts = _scrape_search_page(context, query)
+                    # Merge avoiding duplicates
+                    existing_ids = {p["post_id"] for p in posts}
+                    for sp in search_posts:
+                        if sp["post_id"] not in existing_ids:
+                            posts.append(sp)
+                except Exception as e:
+                    print_substep(f"Search query failed: {e}", "yellow")
+
+        if not posts:
+            raise RuntimeError("No posts found in feed. Try again later.")
+
+        candidates = _filter_candidates(posts)
+        if not candidates:
+            raise RuntimeError(
+                f"No eligible posts in feed after filtering. "
+                f"Try lowering min_engagement (currently {min_engagement:,}) "
+                f"or min_replies (currently {min_replies})."
+            )
+
+        for i, candidate in enumerate(candidates):
+            eng = candidate.get("_total_engagement", 0)
+            print_substep(
+                f"Trying #{i + 1}: ♥{candidate['likes']:,} "
+                f"💬{candidate['replies_shown']} "
+                f"'{candidate['body'][:60]}...'",
+                style="dim",
+            )
+            emit_scraper_event("visiting_post", {
+                "post_id": candidate["post_id"],
+                "url": candidate["url"],
+                "engagement": eng,
+                "likes": candidate.get("likes", 0),
+                "body": candidate.get("body", "")[:60],
+                "attempt": i + 1,
+            })
+            try:
+                replies = _scrape_post_replies(context, candidate["url"])
+                emit_scraper_event("replies_found", {
+                    "post_id": candidate["post_id"],
+                    "count": len(replies),
+                    "min_required": min_replies,
+                })
+                if len(replies) >= min_replies:
+                    if not candidate.get("body") or len(candidate.get("body", "")) < 50:
+                        full_text = _scrape_main_post_text(context, candidate["url"])
+                        if full_text:
+                            candidate["body"] = full_text
+                    content = _build_content_object(candidate, replies)
+                    title_preview = content["thread_title"][:60]
+                    print_substep(
+                        f"Selected: '{title_preview}...' "
+                        f"♥{candidate['likes']:,} 💬{len(content['comments'])} replies",
+                        style="bold green",
+                    )
+                    emit_scraper_event("post_selected", {
+                        "title": content["thread_title"][:80],
+                        "post_id": candidate["post_id"],
+                        "likes": candidate["likes"],
+                        "replies_count": len(content["comments"]),
+                        "url": candidate["url"],
+                    })
+                    return content
+                print_substep(
+                    f"  Only {len(replies)} replies (need {min_replies}). Trying next...",
+                    style="yellow",
+                )
+            except Exception as e:
+                print_substep(f"  Failed: {e}. Trying next...", style="yellow")
+                continue
+
+        raise RuntimeError(
+            f"No eligible posts with {min_replies}+ replies found "
+            f"after trying {len(candidates)} candidates."
+        )

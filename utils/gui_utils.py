@@ -124,11 +124,21 @@ def modify_settings(data: dict, config_load, checks: dict):
             cursor = cursor[part]
         cursor[parts[-1]] = value
 
+    def has_path(obj: dict, dotted_path: str) -> bool:
+        cursor = obj
+        for part in dotted_path.split("."):
+            if not isinstance(cursor, dict) or part not in cursor:
+                return False
+            cursor = cursor[part]
+        return True
+
     # Filter data to only include keys present in checks
     data = {key: value for key, value in data.items() if key in checks.keys()}
 
     # Validate and apply values
     for name, raw_value in data.items():
+        existed_before = has_path(config_load, name)
+
         if is_sensitive_setting(name) and raw_value == MASKED_SECRET_VALUE:
             continue
 
@@ -138,6 +148,11 @@ def modify_settings(data: dict, config_load, checks: dict):
         if value == "Error":
             flash("Some values were incorrect and didn't save!", "error")
         else:
+            if not existed_before:
+                if checks[name].get("default") == value:
+                    continue
+                if checks[name].get("optional", False) and value == "":
+                    continue
             # Value is valid
             set_by_path(config_load, name, value)
 

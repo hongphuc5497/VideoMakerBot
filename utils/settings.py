@@ -13,6 +13,30 @@ config = dict  # autocomplete
 _TYPE_COERCION = {"int": int, "float": float, "bool": bool, "str": str}
 
 
+def apply_template_defaults(config_data: Dict, template_file="utils/.config.template.toml") -> Dict:
+    """Fill missing config values from template defaults without prompting.
+
+    The CLI uses check_toml(), which can prompt interactively and then writes a
+    fully-populated config.toml. The GUI cannot prompt inside its background
+    thread, so it needs a non-interactive way to make partial configs usable.
+    Values already present in config_data are never overwritten.
+    """
+    template = toml.load(template_file)
+
+    def merge_defaults(target: dict, schema: dict) -> None:
+        for key, value in schema.items():
+            if isinstance(value, dict) and "optional" in value:
+                if key not in target and "default" in value:
+                    target[key] = value["default"]
+            elif isinstance(value, dict):
+                section = target.setdefault(key, {})
+                if isinstance(section, dict):
+                    merge_defaults(section, value)
+
+    merge_defaults(config_data, template)
+    return config_data
+
+
 def crawl(obj: dict, func=lambda x, y: print(x, y, end="\n"), path=None):
     if path is None:  # path Default argument value is mutable
         path = []

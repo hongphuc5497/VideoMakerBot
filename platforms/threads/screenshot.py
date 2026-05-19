@@ -1,13 +1,14 @@
-"""Captures screenshots of Threads posts via Playwright."""
+"""Captures screenshots of Threads posts via the configured browser backend."""
 
 import re
 from pathlib import Path
 from typing import Final
 
-from playwright.sync_api import ViewportSize, sync_playwright
+from playwright.sync_api import ViewportSize
 
 from platforms.threads.auth import ensure_authenticated_context
 from utils import settings
+from utils.browser_backend import launch_browser
 from utils.console import print_step, print_substep
 
 
@@ -40,9 +41,8 @@ def get_screenshots_of_threads_posts(content_object: dict, screenshot_num: int) 
     # Device scale factor (higher resolution screenshots)
     dsf = (W // 600) + 1
 
-    with sync_playwright() as p:
+    with launch_browser(headless=True) as browser:
         print_substep("Launching headless browser...")
-        browser = p.chromium.launch(headless=True)
         context = ensure_authenticated_context(
             browser,
             color_scheme="dark" if theme == "dark" else "light",
@@ -152,7 +152,5 @@ def get_screenshots_of_threads_posts(content_object: dict, screenshot_num: int) 
                         continue
 
             print_substep(f"Reply screenshots captured ({num_replies} total).", style="bold green")
-
-        browser.close()
 
     print_substep("Threads screenshots downloaded successfully.", style="bold green")

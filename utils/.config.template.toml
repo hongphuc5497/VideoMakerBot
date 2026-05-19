@@ -64,6 +64,9 @@ resolution_h = { optional = false, default = 1920, example = 2560, explantation 
 zoom = { optional = true, default = 1, example = 1.1, explanation = "Sets the browser zoom level. Useful if you want the text larger.", type = "float", nmin = 0.1, nmax = 2, oob_error = "The text is really difficult to read at a zoom level higher than 2" }
 channel_name = { optional = true, default = "Reddit Tales", example = "Reddit Stories", explanation = "Sets the channel name for the video" }
 
+[settings.browser]
+backend = { optional = true, default = "playwright", options = ["playwright", "cloakbrowser"], type = "str", explanation = "Browser backend for Threads scraping/screenshots. Defaults to Playwright; CloakBrowser is opt-in." }
+
 [settings.background]
 background_video = { optional = true, default = "minecraft", example = "rocket-league", options = ["minecraft", "gta", "rocket-league", "motor-gta", "csgo-surf", "cluster-truck", "minecraft-2","multiversus","fall-guys","steep", "black", ""], explanation = "Sets the background for the video based on game name" }
 background_audio = { optional = true, default = "lofi", example = "chill-summer", options = ["lofi","lofi-2","chill-summer",""], explanation = "Sets the background audio for the video" }
@@ -75,7 +78,7 @@ background_thumbnail_font_size = { optional = true, type = "int", default = 96, 
 background_thumbnail_font_color = { optional = true, default = "255,255,255", example = "255,255,255", explanation = "Font color in RGB format for the thumbnail text" }
 
 [settings.tts]
-voice_choice = { optional = false, default = "tiktok", options = ["elevenlabs", "streamlabspolly", "tiktok", "googletranslate", "awspolly", "pyttsx", "OpenAI"], example = "tiktok", explanation = "The voice platform used for TTS generation. " }
+voice_choice = { optional = false, default = "Supertonic", options = ["elevenlabs", "streamlabspolly", "tiktok", "googletranslate", "awspolly", "pyttsx", "OpenAI", "Supertonic"], example = "Supertonic", explanation = "The voice platform used for TTS generation. " }
 random_voice = { optional = false, type = "bool", default = true, example = true, options = [true, false,], explanation = "Randomizes the voice used for each comment" }
 elevenlabs_voice_name = { optional = false, default = "Bella", example = "Bella", explanation = "The voice used for elevenlabs", options = ["Adam", "Antoni", "Arnold", "Bella", "Domi", "Elli", "Josh", "Rachel", "Sam", ] }
 elevenlabs_api_key = { optional = true, example = "21f13f91f54d741e2ae27d2ab1b99d59", explanation = "Elevenlabs API key" }
@@ -91,3 +94,8 @@ openai_api_url = { optional = true, default = "https://api.openai.com/v1/", exam
 openai_api_key = { optional = true, example = "sk-abc123def456...", explanation = "Your OpenAI API key for TTS generation" }
 openai_voice_name = { optional = false, default = "alloy", example = "alloy", explanation = "The voice used for OpenAI TTS generation", options = ["alloy", "ash", "coral", "echo", "fable", "onyx", "nova", "sage", "shimmer", "af_heart"] }
 openai_model = { optional = false, default = "tts-1", example = "tts-1", explanation = "The model variant used for OpenAI TTS generation", options = ["tts-1", "tts-1-hd", "gpt-4o-mini-tts"] }
+supertonic_voice = { optional = true, default = "M1", example = "M1", explanation = "The built-in Supertonic voice style.", options = ["M1", "M2", "M3", "M4", "M5", "F1", "F2", "F3", "F4", "F5"] }
+supertonic_lang = { optional = true, default = "na", example = "na", explanation = "Language code passed to Supertonic synthesis." }
+supertonic_steps = { optional = true, default = 8, example = 8, type = "int", nmin = 5, nmax = 12, explanation = "Supertonic quality steps. Higher is slower." }
+supertonic_speed = { optional = true, default = 1.05, example = 1.05, type = "float", nmin = 0.7, nmax = 2.0, explanation = "Supertonic speech speed." }
+supertonic_custom_voice_path = { optional = true, default = "", example = "", explanation = "Optional path to a Supertonic custom voice style JSON." }

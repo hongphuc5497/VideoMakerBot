@@ -270,3 +270,5 @@ agentdb.rvf.lock
 claude-flow.config.json
 ruvector.db
 pipeline-ui-*.png
+.codex
+.agents
