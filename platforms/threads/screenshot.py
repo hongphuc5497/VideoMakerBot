@@ -4,12 +4,34 @@ import re
 from pathlib import Path
 from typing import Final
 
-from playwright.sync_api import ViewportSize
+from playwright.sync_api import Page, ViewportSize
 
 from platforms.threads.auth import ensure_authenticated_context
 from utils import settings
 from utils.browser_backend import launch_browser
 from utils.console import print_step, print_substep
+
+
+def _dismiss_popups(page: Page) -> None:
+    """Dismiss common Threads/Instagram overlays that block screenshots."""
+    dismissals = [
+        ("[role='button']", "Not now"),
+        ("button", "Allow all cookies"),
+        ("[aria-label='Close']", None),
+        ("div[role='dialog'] button", "Not Now"),
+    ]
+    for selector, text in dismissals:
+        try:
+            if text:
+                el = page.locator(selector, has_text=text).first
+            else:
+                el = page.locator(selector).first
+            if el.count() and el.is_visible():
+                el.click()
+                page.wait_for_timeout(500)
+                print_substep(f"Dismissed popup: {selector}", style="dim")
+        except Exception:
+            pass
 
 
 def get_screenshots_of_threads_posts(content_object: dict, screenshot_num: int) -> None:
@@ -29,14 +51,7 @@ def get_screenshots_of_threads_posts(content_object: dict, screenshot_num: int) 
     thread_id = re.sub(r"[^\w\s-]", "", content_object["thread_id"])
     Path(f"assets/temp/{thread_id}/png").mkdir(parents=True, exist_ok=True)
 
-    # Theme colors
     theme = settings.config["settings"]["theme"]
-    if theme == "dark":
-        bgcolor = (33, 33, 36, 255)
-        txtcolor = (240, 240, 240)
-    else:
-        bgcolor = (255, 255, 255, 255)
-        txtcolor = (0, 0, 0)
 
     # Device scale factor (higher resolution screenshots)
     dsf = (W // 600) + 1
@@ -55,6 +70,14 @@ def get_screenshots_of_threads_posts(content_object: dict, screenshot_num: int) 
         page.goto(content_object["thread_url"], timeout=0)
         page.wait_for_load_state("networkidle")
         page.wait_for_timeout(3000)
+
+        _dismiss_popups(page)
+
+        if page.locator('div[role="dialog"] button:has-text("Log in")').first.is_visible():
+            raise RuntimeError(
+                "Threads login overlay is blocking the page — saved cookies are stale. "
+                "Delete video_creation/data/cookie-threads.json and re-run."
+            )
 
         postcontentpath = f"assets/temp/{thread_id}/png/title.png"
         try:
@@ -98,6 +121,12 @@ def get_screenshots_of_threads_posts(content_object: dict, screenshot_num: int) 
             if num_replies > 0:
                 # Scroll to load all replies inline on the post page
                 print_substep("Loading replies on post page...", style="dim")
+                _dismiss_popups(page)
+                if page.locator('div[role="dialog"] button:has-text("Log in")').first.is_visible():
+                    raise RuntimeError(
+                        "Threads login overlay is blocking the page — saved cookies are stale. "
+                        "Delete video_creation/data/cookie-threads.json and re-run."
+                    )
                 last_count = 0
                 stable_count = 0
                 for _ in range(20):

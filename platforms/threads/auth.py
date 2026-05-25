@@ -13,6 +13,7 @@ from utils import settings
 from utils.console import emit_scraper_event, print_substep
 
 THREADS_LOGIN_URL = "https://www.threads.com/login"
+THREADS_AUTH_CHECK_URL = "https://www.threads.net/"
 THREADS_COOKIE_FILE = "./video_creation/data/cookie-threads.json"
 DEFAULT_USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -43,6 +44,22 @@ def _is_logged_in_threads_url(url: str) -> bool:
     return parsed.scheme == "https" and hostname in THREADS_HOSTS and not any(
         path.startswith(prefix) for prefix in THREADS_NON_AUTH_PATH_PREFIXES
     )
+
+
+def _has_login_gate(page: Page) -> bool:
+    """Detect Threads login modal overlaying the page."""
+    gate_selectors = [
+        'input[autocomplete="username"]',
+        'input[autocomplete="current-password"]',
+        'div[role="dialog"] button:has-text("Log in")',
+    ]
+    for selector in gate_selectors:
+        try:
+            if page.locator(selector).first.is_visible():
+                return True
+        except Exception:
+            continue
+    return False
 
 
 def login_to_threads(page: Page, _context: BrowserContext) -> None:
@@ -131,6 +148,20 @@ def ensure_authenticated_context(browser: Browser, **kwargs) -> BrowserContext:
             context.add_cookies(saved_cookies)
             print_substep("Loaded saved Threads session cookies.")
             emit_scraper_event("login", {"message": "Loaded saved session cookies"})
+
+            # Verify loaded cookies are still valid
+            page = context.new_page()
+            try:
+                page.goto(THREADS_AUTH_CHECK_URL, timeout=0)
+                page.wait_for_load_state("domcontentloaded")
+                page.wait_for_timeout(1500)
+                if _has_login_gate(page):
+                    print_substep("Saved Threads cookies expired. Re-logging in...", style="yellow")
+                    context.clear_cookies()
+                    cookie_path.unlink(missing_ok=True)
+                    login_to_threads(page, context)
+            finally:
+                page.close()
         except (json.JSONDecodeError, IOError):
             print_substep("Saved cookies corrupted. Logging in fresh...")
             page = context.new_page()

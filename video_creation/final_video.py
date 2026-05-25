@@ -307,10 +307,9 @@ def make_final_video(
     console.log(f"[bold green] Video Will Be: {length} Seconds Long")
 
     # --- Step 4: Build overlay items ---
-    screenshot_width = int((W * 45) // 100)
-    Path(f"assets/temp/{reddit_id}/png").mkdir(parents=True, exist_ok=True)
-
     platform = settings.config["settings"].get("platform", "reddit")
+    screenshot_width = int(W * (0.82 if platform == "threads" else 0.45))
+    Path(f"assets/temp/{reddit_id}/png").mkdir(parents=True, exist_ok=True)
 
     # Use actual screenshot for non-Reddit platforms (Threads etc.), Reddit template for Reddit
     title_img_path = f"assets/temp/{reddit_id}/png/title.png"
@@ -330,7 +329,7 @@ def make_final_video(
         "duration": audio_clips_durations[0],
         "opacity": opacity,
         "scale_w": screenshot_width,
-        "scale_h": -1,
+        "scale_h": -2,
     })
     current_time += audio_clips_durations[0]
 
@@ -344,7 +343,7 @@ def make_final_video(
                     "duration": audio_clips_durations[1] if len(audio_clips_durations) > 1 else 5,
                     "opacity": opacity,
                     "scale_w": screenshot_width,
-                    "scale_h": -1,
+                    "scale_h": -2,
                 })
         elif settings.config["settings"]["storymodemethod"] == 1:
             for i in range(number_of_clips):
@@ -359,7 +358,7 @@ def make_final_video(
                         "duration": audio_clips_durations[dur_idx],
                         "opacity": opacity,
                         "scale_w": screenshot_width,
-                        "scale_h": -1,
+                        "scale_h": -2,
                     })
                 current_time += audio_clips_durations[dur_idx]
     else:
@@ -375,7 +374,7 @@ def make_final_video(
                     "duration": audio_clips_durations[dur_idx],
                     "opacity": opacity,
                     "scale_w": screenshot_width,
-                    "scale_h": -1,
+                    "scale_h": -2,
                 })
             current_time += audio_clips_durations[dur_idx]
 
