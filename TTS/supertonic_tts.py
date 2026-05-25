@@ -1,4 +1,5 @@
 import random
+import re
 import subprocess
 import tempfile
 from pathlib import Path
@@ -6,6 +7,11 @@ from pathlib import Path
 from supertonic import TTS
 
 from utils import settings
+
+# Zero-width and invisible formatting characters rejected by supertonic.
+# ​ ZWSP, ‌ ZWNJ, ‍ ZWJ, ‎ LTR, ‏ RTL,
+# ⁠ word joiner, ﻿ BOM
+_ZW_RE = re.compile("[​-‏⁠﻿]")
 
 
 class SupertonicTTS:
@@ -17,18 +23,43 @@ class SupertonicTTS:
         output_path = Path(filepath)
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
+        # Strip known invisible characters first, then retry on any others
+        # that supertonic rejects — social media text has unpredictable Unicode.
+        text = _ZW_RE.sub("", text)
+
         tts_settings = settings.config["settings"].get("tts", {})
         voice_style = self._voice_style(tts_settings, random_voice)
+        synth_kwargs = {
+            "voice_style": voice_style,
+            "lang": tts_settings.get("supertonic_lang", "na"),
+            "total_steps": int(tts_settings.get("supertonic_steps", 8)),
+            "speed": float(tts_settings.get("supertonic_speed", 1.05)),
+            "max_chunk_length": self.max_chars,
+            "verbose": False,
+        }
 
-        wav, _duration = self.tts.synthesize(
-            text,
-            voice_style=voice_style,
-            lang=tts_settings.get("supertonic_lang", "na"),
-            total_steps=int(tts_settings.get("supertonic_steps", 8)),
-            speed=float(tts_settings.get("supertonic_speed", 1.05)),
-            max_chunk_length=self.max_chars,
-            verbose=False,
-        )
+        for _ in range(3):
+            try:
+                wav, _duration = self.tts.synthesize(text, **synth_kwargs)
+                break
+            except ValueError as e:
+                msg = str(e)
+                if "unsupported character" not in msg:
+                    raise
+                # Extract and strip the reported characters
+                chars = re.findall(r"'(.+?)'", msg)
+                if not chars:
+                    raise
+                for c in chars:
+                    text = text.replace(c, "")
+                if not text.strip():
+                    raise ValueError(
+                        "Text is empty after stripping unsupported characters"
+                    ) from e
+        else:
+            raise RuntimeError(
+                "Supertonic still rejecting characters after 3 retries"
+            )
 
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_wav:
             wav_path = Path(temp_wav.name)

@@ -317,6 +317,17 @@ def _contains_blocked(text: str, blocked_raw: str) -> bool:
     return any(word in text_lower for word in blocked)
 
 
+def _is_english_text(text: str) -> bool:
+    """Return True if text is predominantly English (Latin alphabet)."""
+    if not text or not text.strip():
+        return False
+    alpha_chars = [c for c in text if c.isalpha()]
+    if not alpha_chars:
+        return False
+    latin = sum(1 for c in alpha_chars if "a" <= c.lower() <= "z")
+    return latin / len(alpha_chars) >= 0.70
+
+
 def _filter_candidates(posts: list[dict]) -> list[dict]:
     """Filter feed posts by engagement, blocked words, and duplicates.
 
@@ -336,6 +347,8 @@ def _filter_candidates(posts: list[dict]) -> list[dict]:
         if _contains_blocked(post["body"], blocked_raw):
             continue
         if not post["body"] or len(post["body"].strip()) < 10:
+            continue
+        if t_config.get("english_only", False) and not _is_english_text(post["body"]):
             continue
         # Age filter
         if max_age_hours is not None:
@@ -501,6 +514,8 @@ def _build_content_object(post: dict, replies: list[dict]) -> dict:
         if not body:
             continue
         if _contains_blocked(body, blocked_raw):
+            continue
+        if t_config.get("english_only", False) and not _is_english_text(body):
             continue
         if not (min_len <= len(body) <= max_len):
             continue

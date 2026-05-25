@@ -40,6 +40,7 @@ min_engagement = { default = 0, optional = true, nmin = 0, type = "int", explana
 max_post_age = { optional = true, default = "", options = ["", "1h", "6h", "24h", "3d", "7d", "30d"], type = "str", explanation = "Maximum age of posts to consider. Empty = no limit.", example = "7d" }
 search_queries = { optional = true, default = "news,politics,trending", type = "str", explanation = "Comma-separated search queries to find trending content on Threads. Combined with main feed results.", example = "news,politics,viral" }
 blocked_words = { optional = true, default = "", type = "str", explanation = "Comma-separated list of blocked words/phrases. Posts and replies containing any of these will be skipped.", example = "nsfw, spoiler, politics" }
+english_only = { optional = true, default = false, options = [true, false], type = "bool", explanation = "Only include English-language posts and replies (Latin alphabet heuristic). Set to true for English-only content." }
 
 [youtube]
 enabled = { optional = true, type = "bool", default = false, options = [true, false], explanation = "Enable automatic YouTube upload after video creation" }

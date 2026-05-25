@@ -274,3 +274,4 @@ pipeline-ui-*.png
 .agents
 .config
 .local
+.gstack/
