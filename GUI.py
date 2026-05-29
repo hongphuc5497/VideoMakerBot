@@ -7,6 +7,7 @@ import time
 import webbrowser
 from copy import deepcopy
 from pathlib import Path
+from urllib.parse import urlparse
 
 # Used "tomlkit" instead of "toml" because it doesn't change formatting on "dump"
 import tomlkit
@@ -21,6 +22,7 @@ from flask import (
     send_from_directory,
     url_for,
 )
+from werkzeug.wrappers import Response
 
 import utils.gui_utils as gui
 from utils.docker_bootstrap import ensure_runtime_state
@@ -33,12 +35,52 @@ HOST = os.environ.get("GUI_HOST", "0.0.0.0")
 PORT = int(os.environ.get("GUI_PORT", "4000"))
 OPEN_BROWSER = os.environ.get("GUI_OPEN_BROWSER", "1").lower() in {"1", "true", "yes", "on"}
 BROWSER_URL = os.environ.get("GUI_BROWSER_URL", f"http://localhost:{PORT}")
+PUBLIC_BASE_PATH = "/" + os.environ.get("PUBLIC_BASE_PATH", "").strip("/")
+if PUBLIC_BASE_PATH == "/":
+    PUBLIC_BASE_PATH = ""
+PUBLIC_DEMO_MODE = os.environ.get("PUBLIC_DEMO_MODE", "0").lower() in {"1", "true", "yes", "on"}
 
 # Configure application
 app = Flask(__name__, template_folder="GUI")
 
 # Configure secret key — env var for production, random per-startup for dev
 app.secret_key = os.environ.get("FLASK_SECRET_KEY") or os.urandom(32)
+
+
+class PrefixMiddleware:
+    def __init__(self, app, prefix: str):
+        self.app = app
+        self.prefix = prefix
+
+    def __call__(self, environ, start_response):
+        if not self.prefix:
+            return self.app(environ, start_response)
+
+        path_info = environ.get("PATH_INFO", "")
+        if path_info == self.prefix:
+            response = Response("", status=308, headers={"Location": f"{self.prefix}/"})
+            return response(environ, start_response)
+        if path_info.startswith(f"{self.prefix}/"):
+            environ["SCRIPT_NAME"] = self.prefix
+            environ["PATH_INFO"] = path_info[len(self.prefix):] or "/"
+
+        return self.app(environ, start_response)
+
+
+app.wsgi_app = PrefixMiddleware(app.wsgi_app, PUBLIC_BASE_PATH)
+
+
+@app.context_processor
+def inject_public_context():
+    def app_url(path: str) -> str:
+        normalized = path if path.startswith("/") else f"/{path}"
+        return f"{request.script_root}{normalized}"
+
+    return {
+        "app_url": app_url,
+        "public_base_path": request.script_root,
+        "public_demo_mode": PUBLIC_DEMO_MODE,
+    }
 
 
 # Ensure responses aren't cached + security headers
@@ -58,12 +100,21 @@ def csrf_check():
     if request.method in ("POST", "PUT", "PATCH", "DELETE"):
         origin = request.headers.get("Origin")
         if origin:
-            # Allow same-origin only (localhost dev ports)
-            from urllib.parse import urlparse
+            # Allow same-origin + public proxy origin (e.g. Vercel rewrites)
             origin_host = urlparse(origin).hostname
-            request_host = urlparse(request.host_url).hostname
-            if origin_host not in (request_host, "localhost", "127.0.0.1"):
+            allowed = {
+                urlparse(request.host_url).hostname,
+                "localhost",
+                "127.0.0.1",
+                *(os.environ.get("PUBLIC_ORIGIN_HOST", "").split(",") if os.environ.get("PUBLIC_ORIGIN_HOST") else []),
+            }
+            allowed.discard("")  # remove empty string
+            if origin_host not in allowed:
                 return jsonify({"error": "CSRF check failed"}), 403
+
+
+def public_demo_forbidden():
+    return jsonify({"error": "This action is disabled in public demo mode"}), 403
 
 
 # Display index.html
@@ -79,6 +130,8 @@ def backgrounds():
 
 @app.route("/background/add", methods=["POST"])
 def background_add():
+    if PUBLIC_DEMO_MODE:
+        return public_demo_forbidden()
     # Get form values
     youtube_uri = request.form.get("youtube_uri", "").strip()
     filename = request.form.get("filename", "").strip()
@@ -92,6 +145,8 @@ def background_add():
 
 @app.route("/background/delete", methods=["POST"])
 def background_delete():
+    if PUBLIC_DEMO_MODE:
+        return public_demo_forbidden()
     key = request.form.get("background-key")
     gui.delete_background(key)
 
@@ -99,7 +154,8 @@ def background_delete():
 
 
 _SENSITIVE_KEYS = {"password", "client_secret", "access_token", "2fa_secret",
-                   "tiktok_sessionid", "elevenlabs_api_key", "openai_api_key"}
+                   "tiktok_sessionid", "elevenlabs_api_key", "openai_api_key",
+                   "api_url", "api_key"}
 
 
 def _redact_secrets(data: dict) -> dict:
@@ -119,6 +175,8 @@ def settings():
     checks = gui.get_checks()
 
     if request.method == "POST":
+        if PUBLIC_DEMO_MODE:
+            return public_demo_forbidden()
         # Get data from form as dict
         data = request.form.to_dict()
 
@@ -183,6 +241,8 @@ def video_by_id(video_id):
 # Delete one or more videos by ID
 @app.route("/videos/delete", methods=["POST"])
 def video_delete():
+    if PUBLIC_DEMO_MODE:
+        return public_demo_forbidden()
     data = request.get_json(silent=True) or {}
     ids = data.get("ids", [])
     if not ids or not isinstance(ids, list):
@@ -306,6 +366,8 @@ def _run_pipeline(search_queries=None):
 @app.route("/create", methods=["GET", "POST"])
 def create():
     if request.method == "POST":
+        if PUBLIC_DEMO_MODE:
+            return public_demo_forbidden()
         if pipeline_state["running"]:
             return jsonify({"status": "already_running"})
         data = request.get_json(silent=True) or {}

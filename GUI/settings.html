@@ -9,16 +9,16 @@
                 <p class="text-[#111111]/50 font-mono text-sm">Configure platform credentials and video generation preferences.</p>
             </div>
             <div class="flex gap-2">
-                <button id="defaultSettingsBtn" type="button" class="btn-ghost-neo text-sm">
+                <button id="defaultSettingsBtn" type="button" class="btn-ghost-neo text-sm" data-demo-disabled>
                     Reset Defaults
                 </button>
-                <button form="settingsForm" type="submit" class="btn-primary-neo text-sm">
+                <button form="settingsForm" type="submit" class="btn-primary-neo text-sm" data-demo-disabled>
                     Save Changes
                 </button>
             </div>
         </div>
 
-        <form id="settingsForm" action="/settings" method="post" novalidate>
+        <form id="settingsForm" action="{{ app_url('/settings') }}" method="post" novalidate>
             <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
 
                 <!-- Navigation Tabs -->
@@ -214,7 +214,7 @@
                                             <option value="{{background}}">{{ background or 'Random' }}</option>
                                             {% endfor %}
                                         </select>
-                                        <label class="label"><a href="/backgrounds" target="_blank" class="label-text-alt text-[#DE6C56] hover:text-[#111111] font-mono text-xs">Manage video files &rarr;</a></label>
+                                        <label class="label"><a href="{{ app_url('/backgrounds') }}" target="_blank" class="label-text-alt text-[#DE6C56] hover:text-[#111111] font-mono text-xs">Manage video files &rarr;</a></label>
                                     </div>
                                     <div class="form-control w-full">
                                         <label class="label"><span class="label-text text-[#111111] font-mono text-xs font-medium">Audio Track</span></label>
@@ -406,6 +406,13 @@
         const data = {{ data | tojson | safe }};
         const validateChecks = {{ checks | tojson | safe }};
         const form = document.getElementById('settingsForm');
+        function lockDemoFields() {
+            if (!window.PUBLIC_DEMO_MODE) return;
+            form.querySelectorAll('input, select, textarea').forEach(function(el) {
+                el.disabled = true;
+            });
+        }
+        lockDemoFields();
 
         // ---- Tab Switching -------------------------------------------------
         const tabs = document.querySelectorAll('#settingsTabs a');
@@ -462,6 +469,7 @@
                 section.classList.toggle('hidden', !matches);
                 section.querySelectorAll('input, select, textarea').forEach(el => el.disabled = !matches);
             });
+            lockDemoFields();
         }
 
         function matchesDiscoveryMethod(section, method) {
@@ -483,6 +491,7 @@
                     el.disabled = !isThreads || (!matches && !preserveHidden);
                 });
             });
+            lockDemoFields();
         }
 
         platformSelect.addEventListener('change', applyPlatformVisibility);
@@ -511,6 +520,7 @@
                     el.disabled = !matches;
                 });
             });
+            lockDemoFields();
         }
 
         voiceChoiceSelect.addEventListener('change', applyTtsVisibility);

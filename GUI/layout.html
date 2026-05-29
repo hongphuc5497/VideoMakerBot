@@ -42,6 +42,20 @@
 
     <!-- Lucide icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        window.PUBLIC_BASE_PATH = {{ public_base_path|tojson }};
+        window.PUBLIC_DEMO_MODE = {{ public_demo_mode|tojson }};
+        window.appPath = function(path) {
+            var normalized = path.charAt(0) === '/' ? path : '/' + path;
+            return window.PUBLIC_BASE_PATH + normalized;
+        };
+        document.addEventListener('DOMContentLoaded', function() {
+            if (!window.PUBLIC_DEMO_MODE) return;
+            document.querySelectorAll('[data-demo-disabled]').forEach(function(el) {
+                el.disabled = true;
+            });
+        });
+    </script>
 
     <style>
         /* ── Neo-Brutalist Global Overrides ───────────────────────────── */
@@ -314,17 +328,17 @@
         <div class="container mx-auto px-4">
             <div class="flex items-center justify-between h-14">
                 <!-- Logo -->
-                <a href="/" class="flex items-center gap-2 no-underline">
+                <a href="{{ app_url('/') }}" class="flex items-center gap-2 no-underline">
                     <span class="font-display text-lg text-[#111111] tracking-tighter uppercase">VideoMakerBot</span>
                 </a>
 
                 <!-- Nav Items -->
                 <div class="flex items-center gap-0">
-                    <a href="/" class="nav-link">Library</a>
-                    <a href="/backgrounds" class="nav-link">Backgrounds</a>
-                    <a href="/settings" class="nav-link">Settings</a>
+                    <a href="{{ app_url('/') }}" class="nav-link">Library</a>
+                    <a href="{{ app_url('/backgrounds') }}" class="nav-link">Backgrounds</a>
+                    <a href="{{ app_url('/settings') }}" class="nav-link">Settings</a>
                     <span class="text-[#111111]/20 mx-1">///</span>
-                    <a href="/create" class="btn-primary-neo text-sm py-1.5 px-4">
+                    <a href="{{ app_url('/create') }}" class="btn-primary-neo text-sm py-1.5 px-4">
                         <i data-lucide="plus" class="w-3.5 h-3.5 inline mr-1"></i>
                         Create
                     </a>

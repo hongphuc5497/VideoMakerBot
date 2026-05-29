@@ -1,5 +1,6 @@
 from unittest.mock import MagicMock, patch
 
+import GUI
 from GUI import app
 
 
@@ -43,3 +44,15 @@ def test_settings_get_uses_template_defaults_for_partial_config():
     assert response.status_code == 200
     assert '"settings.tts.voice_choice": "Supertonic"' in body
     assert 'name="settings.tts.supertonic_voice"' in body
+
+
+def test_public_demo_mode_blocks_mutating_routes(monkeypatch):
+    app.testing = True
+    monkeypatch.setattr(GUI, "PUBLIC_DEMO_MODE", True)
+    client = app.test_client()
+
+    assert client.post("/background/add", data={}).status_code == 403
+    assert client.post("/background/delete", data={}).status_code == 403
+    assert client.post("/settings", data={}).status_code == 403
+    assert client.post("/videos/delete", json={"ids": ["abc"]}).status_code == 403
+    assert client.post("/create", json={}).status_code == 403

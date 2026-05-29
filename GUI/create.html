@@ -30,9 +30,11 @@
                                     <input id="keywords-input" type="text"
                                            class="input-neo flex-1"
                                            placeholder="news, politics, trending, viral"
-                                           value="{{ default_search_queries }}">
+                                           value="{{ default_search_queries }}"
+                                           data-demo-disabled>
                                     <button id="clear-keywords" class="btn-ghost-neo"
-                                            onclick="document.getElementById('keywords-input').value=''" type="button">
+                                            onclick="document.getElementById('keywords-input').value=''" type="button"
+                                            data-demo-disabled>
                                         <i data-lucide="x" class="w-4 h-4"></i>
                                     </button>
                                 </div>
@@ -91,7 +93,7 @@
                                         <span class="font-display font-black uppercase tracking-tighter text-lg text-[#111111]">Generation Complete!</span>
                                     </div>
                                     <p id="done-msg" class="text-[#111111]/60 font-mono text-sm">Your video has been rendered and saved to the library.</p>
-                                    <a href="/" class="btn-secondary-neo text-sm">View Video</a>
+                                    <a href="{{ app_url('/') }}" class="btn-secondary-neo text-sm">View Video</a>
                                 </div>
                             </div>
 
@@ -454,7 +456,7 @@
         const keywords = document.getElementById('keywords-input').value.trim();
 
         try {
-            const r = await fetch('/create', {
+            const r = await fetch(window.appPath('/create'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ search_queries: keywords || null }),
@@ -477,7 +479,7 @@
 
     async function pollStatus() {
         try {
-            const r = await fetch('/create/status');
+            const r = await fetch(window.appPath('/create/status'));
             const state = await r.json();
 
             const stageText = document.getElementById('stage-text');
@@ -535,11 +537,14 @@
     window.addEventListener('load', async function() {
         lucide.createIcons();
         try {
-            const r = await fetch('/create/status');
+            const r = await fetch(window.appPath('/create/status'));
             const state = await r.json();
             const btn = document.getElementById('create-btn');
 
-            if (state.running) {
+            if (window.PUBLIC_DEMO_MODE) {
+                btn.disabled = true;
+                document.getElementById('btn-text').textContent = 'Public Demo: Disabled';
+            } else if (state.running) {
                 document.getElementById('progress-area').classList.remove('hidden');
                 document.getElementById('log-area').classList.remove('hidden');
                 btn.disabled = true;
@@ -558,8 +563,8 @@
             }
         } catch (err) {
             console.error("Initial status check failed:", err);
-            document.getElementById('create-btn').disabled = false;
-            document.getElementById('btn-text').textContent = 'Start Generation';
+            document.getElementById('create-btn').disabled = window.PUBLIC_DEMO_MODE;
+            document.getElementById('btn-text').textContent = window.PUBLIC_DEMO_MODE ? 'Public Demo: Disabled' : 'Start Generation';
         }
     });
 </script>
