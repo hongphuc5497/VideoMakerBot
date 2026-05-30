@@ -46,6 +46,9 @@ app = Flask(__name__, template_folder="GUI")
 # Configure secret key — env var for production, random per-startup for dev
 app.secret_key = os.environ.get("FLASK_SECRET_KEY") or os.urandom(32)
 
+# Disable trailing-slash redirects to avoid loops with Vercel's trailingSlash: false
+app.url_map.strict_slashes = False
+
 
 class PrefixMiddleware:
     def __init__(self, app, prefix: str):
