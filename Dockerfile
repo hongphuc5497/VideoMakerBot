@@ -46,3 +46,4 @@ RUN chmod +x /app/docker-entrypoint.sh
 USER appuser
 
 ENTRYPOINT ["/bin/sh", "/app/docker-entrypoint.sh"]
+CMD ["python", "GUI.py"]
