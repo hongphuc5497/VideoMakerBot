@@ -40,6 +40,8 @@ RUN groupadd -r appuser && useradd -r -g appuser -d /app appuser \
     && chown -R appuser:appuser /app /ms-playwright
 
 ENV CLOAKBROWSER_CACHE_DIR=/app/.cache/cloakbrowser
+ENV PUBLIC_BASE_PATH=/threads-video-maker
+ENV PUBLIC_DEMO_MODE=1
 
 RUN chmod +x /app/docker-entrypoint.sh
 
