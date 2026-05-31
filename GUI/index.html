@@ -139,7 +139,7 @@
 
     async function loadVideos() {
         try {
-            const response = await fetch("videos.json");
+            const response = await fetch(window.appPath("/videos.json"));
             const data = await response.json();
             data.sort((b, a) => a['time'] - b['time']);
 
