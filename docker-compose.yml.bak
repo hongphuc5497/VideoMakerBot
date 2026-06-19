@@ -1,6 +1,5 @@
 services:
   gui:
-    user: root
     build:
       context: .
     image: videomakerbot:latest
