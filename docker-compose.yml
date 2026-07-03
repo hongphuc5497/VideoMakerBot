@@ -1,5 +1,8 @@
 services:
   gui:
+    # Playwright/Chromium needs root to run inside the container.
+    # For production, consider creating a dedicated user with proper permissions.
+    user: root
     build:
       context: .
     image: videomakerbot:latest
