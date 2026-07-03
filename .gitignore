@@ -275,3 +275,4 @@ pipeline-ui-*.png
 .config
 .local
 .gstack/
+*.bak
