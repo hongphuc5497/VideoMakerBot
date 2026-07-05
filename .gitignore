@@ -275,4 +275,6 @@ pipeline-ui-*.png
 .config
 .local
 .gstack/
-*.bak
+
+# Agent Ops runtime directory (managed by agent-ops init).
+.ai/
